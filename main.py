@@ -1,4 +1,4 @@
-import numpy as np
+
 from random import sample
 from matplotlib import pyplot as plt
 import numpy as np
@@ -133,6 +133,7 @@ if __name__ == '__main__':
     print("the best solution: ", diff_evolution.get_best())
     fig, (ax1, ax2) = plt.subplots(2)
     fig.suptitle("Error")
-    ax1.plot(np.log10(np.abs(diff_evolution.filter_history(0))))
-    ax2.plot(np.log10(np.abs(diff_evolution.filter_history(1))))
+    optimal_value = [0, 0]
+    ax1.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(0)) - optimal_value[0])))
+    ax2.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(1)) - optimal_value[1])))
     plt.show()
