@@ -1,4 +1,3 @@
-
 from random import sample
 from matplotlib import pyplot as plt
 import numpy as np
@@ -105,6 +104,8 @@ class DifferentialEvolution:
 
     def get_best(self):
         best_cost = np.inf
+        best = np.inf
+        best_idx = np.inf
         for idx, individual in enumerate(self.population):
             cost = self.cost_function(individual)
             if cost < best_cost:
@@ -130,7 +131,7 @@ if __name__ == '__main__':
                                            strategy="DE/current-to-rand/1")
     diff_evolution.initialize()
     diff_evolution.evolve()
-    print("the best solution: ", diff_evolution.get_best())
+    print("the best solution: ", diff_evolution.get_best)
     fig, (ax1, ax2) = plt.subplots(2)
     fig.suptitle("Error")
     optimal_value = [0, 0]
