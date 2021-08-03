@@ -48,7 +48,7 @@ class DifferentialEvolution:
     def generate_crossover_candidates(self, idx):
         crossover_candidates = [idx]
         while idx in crossover_candidates:
-            crossover_candidates = sample(range(self.population_size - 1), 5)
+            crossover_candidates = sample(range(self.population_size - 1), 6)
         if self.strategy == "DE/rand/1":
             return crossover_candidates[:3]
         elif self.strategy == "DE/rand/2":
@@ -62,6 +62,13 @@ class DifferentialEvolution:
         elif self.strategy == "DE/current-to-best/1":
             crossover_candidates[0] = self.generation_best_individual_idx
             crossover_candidates[1] = idx
+            return crossover_candidates[:4]
+        elif self.strategy == "DE/current-to-best/2":
+            crossover_candidates[0] = self.generation_best_individual_idx
+            crossover_candidates[1] = idx
+            return crossover_candidates
+        elif self.strategy == "DE/current-to-rand/1":
+            crossover_candidates[0] = idx
             return crossover_candidates[:4]
 
     def mutate(self, crossover_candidates, dimension):
@@ -79,6 +86,20 @@ class DifferentialEvolution:
             return self.population[crossover_candidates[1]][dimension] + \
                    self.mutation[0] * (self.population[crossover_candidates[0]][dimension] -
                                        self.population[crossover_candidates[1]][dimension]) +\
+                   self.mutation[1] * (self.population[crossover_candidates[2]][dimension] -
+                                       self.population[crossover_candidates[3]][dimension])
+        elif self.strategy == "DE/current-to-best/2":
+            return self.population[crossover_candidates[1]][dimension] + \
+                   self.mutation[0] * (self.population[crossover_candidates[0]][dimension] -
+                                       self.population[crossover_candidates[1]][dimension]) + \
+                   self.mutation[1] * (self.population[crossover_candidates[2]][dimension] -
+                                       self.population[crossover_candidates[3]][dimension]) + \
+                   self.mutation[1] * (self.population[crossover_candidates[4]][dimension] -
+                                       self.population[crossover_candidates[5]][dimension])
+        elif self.strategy == "DE/current-to-rand/1":
+            return self.population[crossover_candidates[0]][dimension] + \
+                   self.mutation[0] * (self.population[crossover_candidates[1]][dimension] -
+                                       self.population[crossover_candidates[0]][dimension]) + \
                    self.mutation[1] * (self.population[crossover_candidates[2]][dimension] -
                                        self.population[crossover_candidates[3]][dimension])
 
@@ -106,7 +127,7 @@ def function_to_minimize(x):
 if __name__ == '__main__':
     diff_evolution = DifferentialEvolution(function_to_minimize, bounds=[[-5, 5], [-5, 5]], max_iterations=100,
                                            population_size=50,  mutation=[0.5, 0.7], crossover=0.7,
-                                           strategy="DE/current-to-best/1")
+                                           strategy="DE/current-to-rand/1")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best())
