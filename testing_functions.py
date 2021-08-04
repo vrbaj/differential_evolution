@@ -74,7 +74,7 @@ def bukin_function(x):
     :param x: input list [x, y]
     :return: value of Bukin function f(x,y)
     """
-    return 100 * np.sqrt(np.abs(x[1] - 0.01 * x[0])) + 0.01 * np.abs(x[0] + 10)
+    return 100 * np.sqrt(np.abs(x[1] - 0.01 * x[0] ** 2)) + 0.01 * np.abs(x[0] + 10)
 
 
 def mccormick_function(x):
@@ -84,7 +84,7 @@ def mccormick_function(x):
     :param x: input list [x, y]
     :return: value of McCormick function $f(x,y)$
     """
-    return np.sin(x[0] + x[1]) + (x[0] - x[1]) ** 2 - 1.5 * x[0] + 2.5 * x[1] + 1
+    return np.sin(x[0] + x[1]) + ((x[0] - x[1]) ** 2) - 1.5 * x[0] + 2.5 * x[1] + 1
 
 
 def three_hump_camel_function(x):
@@ -94,7 +94,7 @@ def three_hump_camel_function(x):
     :param x: input list [x, y]
     :return: value of three-hump camel function $f(x,y)$
     """
-    return 2 * x[0] - 1.05 * x[0] ** 4 + 1 / 6 * x[0] ** 6 + x[0] * x[1] + x[1] ** 2
+    return 2 * x[0] ** 2 - 1.05 * x[0] ** 4 + 1 / 6 * x[0] ** 6 + x[0] * x[1] + x[1] ** 2
 
 
 def ackley_function(x):

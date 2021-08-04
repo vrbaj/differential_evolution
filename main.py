@@ -134,7 +134,9 @@ def function_to_minimize(x):
 
 
 if __name__ == '__main__':
-    diff_evolution = DifferentialEvolution(function_to_minimize, bounds=[[-5, 5], [-5, 5]], max_iterations=100,
+    from testing_functions import mccormick_function as sphere_function
+
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-1.5, 4], [-3, 4]], max_iterations=100,
                                            population_size=50,  mutation=[0.7, 0.7], crossover=0.7,
                                            strategy="DE/current-to-rand/1")
     diff_evolution.initialize()
@@ -146,3 +148,4 @@ if __name__ == '__main__':
     ax1.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(0)) - optimal_value[0])))
     ax2.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(1)) - optimal_value[1])))
     plt.show()
+    print(diff_evolution.get_best())
