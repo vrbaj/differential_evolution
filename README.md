@@ -20,6 +20,7 @@ Various standard testing and population diversity measurement functions are also
 - Himmelblau's function
 - Bukin function
 - McCormick function
+- Three-hump camel function
 
 
 ## Implemented functions for population diversity estimation

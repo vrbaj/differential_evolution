@@ -85,3 +85,13 @@ def mccormick_function(x):
     :return: value of McCormick function f(x,y)
     """
     return np.sin(x[0] + x[1]) + (x[0] - x[1]) ** 2 - 1.5 * x[0] + 2.5 * x[1] + 1
+
+
+def three_hump_camel_function(x):
+    """
+    Three-hump camel function given as $f(x,y)=2x^2-1.05x^4+\frac{x^6}{6}+xy+y^2$
+    with global minimum $f(0,0)=0$
+    :param x: input list [x, y]
+    :return: value of three-hump camel function
+    """
+    return 2 * x[0] - 1.05 * x[0] ** 4 + 1 / 6 * x[0] ** 6 + x[0] * x[1] + x[1] ** 2
