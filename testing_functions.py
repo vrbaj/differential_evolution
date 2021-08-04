@@ -65,3 +65,13 @@ def himmelblaus_function(x):
     :return: the value of Himmelblaus function f(x,y)
     """
     return (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2
+
+
+def bukin_function(x):
+    """
+    Bukin function given as $f(x,y)=100\sqrt{\lvert|y-0.01x^2 \rvert|} + 0.01\lvert| x + 10 \rvert|$
+    with global minimum $f(-10,1)=0$
+    :param x: input list [x, y]
+    :return: value of Bukin function f(x,y)
+    """
+    return 100 * np.sqrt(np.abs(x[1] - 0.01 * x[0])) + 0.01 * np.abs(x[0] + 10)

@@ -18,6 +18,7 @@ Various standard testing and population diversity measurement functions are also
 - Booth function
 - Matyas function
 - Himmelblau's function
+- Bukin function
 
 
 ## Implemented functions for population diversity estimation
