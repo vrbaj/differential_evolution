@@ -75,3 +75,13 @@ def bukin_function(x):
     :return: value of Bukin function f(x,y)
     """
     return 100 * np.sqrt(np.abs(x[1] - 0.01 * x[0])) + 0.01 * np.abs(x[0] + 10)
+
+
+def mccormick_function(x):
+    """
+    McCormick function given as $f(x,y)=sin(x+y) + (x-y)^2 - 1.5x + 2.5y + 1$
+    with global minimum $f(-0.54719,-1.54719)=-1.9133$
+    :param x: input list [x, y]
+    :return: value of McCormick function f(x,y)
+    """
+    return np.sin(x[0] + x[1]) + (x[0] - x[1]) ** 2 - 1.5 * x[0] + 2.5 * x[1] + 1
