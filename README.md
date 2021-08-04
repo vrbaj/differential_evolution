@@ -12,6 +12,7 @@ Various standard testing and population diversity measurement functions are also
 - DE/current-to-rand/1
 
 ## Implemented testing functions
+- sphere function
 
 
 ## Implemented functions for population diversity estimation

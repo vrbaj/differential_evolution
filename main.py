@@ -127,7 +127,7 @@ def function_to_minimize(x):
 
 if __name__ == '__main__':
     diff_evolution = DifferentialEvolution(function_to_minimize, bounds=[[-5, 5], [-5, 5]], max_iterations=100,
-                                           population_size=50,  mutation=[0.5, 0.7], crossover=0.7,
+                                           population_size=50,  mutation=[0.7, 0.7], crossover=0.7,
                                            strategy="DE/current-to-rand/1")
     diff_evolution.initialize()
     diff_evolution.evolve()
