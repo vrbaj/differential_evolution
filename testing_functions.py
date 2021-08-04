@@ -4,6 +4,7 @@ import numpy as np
 def sphere_function(x):
     """
     Classical sphere function $y(x) = \sum_{i=1}^n x_{i}^{2}
+    with global minimum $y(0,...,0) = 0$
     :param x: input list of length n
     :return: the value of sphere function y(x)
     """
@@ -13,7 +14,7 @@ def sphere_function(x):
 def rastrigin_function(x):
     """
     Rastrigin function given as $y(x) = A * n + \sum_{i=1}^n(x_i^2 - A * cos(2 * \pi * x_i))$
-    with global minimum y(0,....0) = 0
+    with global minimum $y(0,...,0) = 0$
     :param x: input list of length n
     :return: the value of Rastrigin function y(x)
     """
@@ -24,7 +25,7 @@ def rastrigin_function(x):
 def beale_function(x):
     """
     Beale function given as $f(x,y) = (1.5 - x - xy)^2 + (2.25 - x + xy^2)^2 + (2.625 - x + xy^3)^2$
-    with global minimum f(3, 0.5) = 0
+    with global minimum $f(3, 0.5) = 0$
     :param x: input list [x, y]
     :return: the value of Beale function f(x,y)
     """
@@ -35,7 +36,18 @@ def beale_function(x):
 def booth_function(x):
     """
     Booth function given as $f(x,y) = (x + 2y - 7)^2 + (2 * x + y - 5)^2$
+    with global minimum $f(1, 3) = 0$
     :param x: input list [x, y]
     :return: the value of Booth function f(x,y)
     """
-    return (x[0] + 2 * x[1] - 7) ** 2 + (2 * x[0] +x[1] - 5) ** 2
+    return (x[0] + 2 * x[1] - 7) ** 2 + (2 * x[0] + x[1] - 5) ** 2
+
+
+def matyas_function(x):
+    """
+    Matyas function given as $f(x,y) = 0.26 * (x^2 + y^2) - 0.48 * x * y$
+    with global minimum $f(0, 0) = 0$
+    :param x:
+    :return:
+    """
+    return 0.26 * (x[0] ** 2 + x[1] ** 2) - 0.48 * x[0] * x[1]

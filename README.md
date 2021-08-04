@@ -13,6 +13,10 @@ Various standard testing and population diversity measurement functions are also
 
 ## Implemented testing functions
 - sphere function
+- Rastrigin function
+- Beale function
+- Booth function
+- Matyas function
 
 
 ## Implemented functions for population diversity estimation
