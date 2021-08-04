@@ -17,6 +17,7 @@ class DifferentialEvolution:
         self.generation_best_individual = None
         self.generation_best_individual_idx = None
         self.best_individual_history = []
+        self.generation_fitness = []
 
     def initialize(self):
         for _ in range(self.population_size):
@@ -28,6 +29,7 @@ class DifferentialEvolution:
     def evolve(self):
         self.generation = 0
         while self.generation < self.max_iterations:
+            self.generation_fitness = []
             self.generation += 1
             self.get_best()
             self.best_individual_history.append(self.generation_best_individual)
@@ -43,6 +45,8 @@ class DifferentialEvolution:
                         new_individual.append(self.mutate(crossover_candidates, dimension))
                 if self.cost_function(new_individual) < self.cost_function(individual):
                     self.population[idx] = new_individual
+                self.generation_fitness.append(self.cost_function(self.population[idx]))
+                # measure diversity here?
 
     def generate_crossover_candidates(self, idx):
         crossover_candidates = [idx]
@@ -119,6 +123,10 @@ class DifferentialEvolution:
     def filter_history(self, dimension):
         solutions = [solution[dimension] for solution in self.best_individual_history]
         return solutions
+
+    def measure_diversity(self, measure):
+        if measure == "std-fitness":
+            return np.std(self.generation_fitness)
 
 
 def function_to_minimize(x):

@@ -22,4 +22,4 @@ Various standard testing and population diversity measurement functions are also
 
 
 ## Implemented functions for population diversity estimation
-
+- standard deviation of fitness function
