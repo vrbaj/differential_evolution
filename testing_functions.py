@@ -120,3 +120,15 @@ def goldstein_price_function(x):
                                           3 * x[1] ** 2)) * (30 + (2 * x[0] - 3 * x[1]) ** 2 *
                                                              (18 - 32 * x[0] + 12 * x[0] ** 2 + 48 * x[1]
                                                               - 36 * x[0] * x[1] + 27 * x[1] ** 2))
+
+
+def levi_function(x):
+    """
+    Levi function n.13 defined as $f(x,y)=sin^2(3\pi x)+(x-1)^2(1+sin^2(3\pi y))+(y-1)^2(1+sin^2 2\pi y)$
+    with global minimum $f(1,1)=0$
+    :param x: input list [x, y]
+    :return: value of Levi function n.13 $f(x,y)$
+    """
+    return np.sin(3 * np.pi * x[0]) ** 2 + (x[0] - 1) ** 2 * (1 + np.sin(3 * np.pi * x[1]) ** 2)\
+                                         + (1 - x[1]) ** 2 * (1 + np.sin(2 * np.pi * x[1]) ** 2)
+

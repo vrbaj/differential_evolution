@@ -23,7 +23,7 @@ Various standard testing and population diversity measurement functions are also
 - Three-hump camel function
 - Ackley function
 - Goldstein-Price function
-
+- Lévi function n.13
 
 ## Implemented functions for population diversity estimation
 - standard deviation of fitness function
