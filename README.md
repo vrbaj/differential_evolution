@@ -22,6 +22,7 @@ Various standard testing and population diversity measurement functions are also
 - McCormick function
 - Three-hump camel function
 - Ackley function
+- Goldstein-Price function
 
 
 ## Implemented functions for population diversity estimation

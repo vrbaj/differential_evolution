@@ -99,10 +99,24 @@ def three_hump_camel_function(x):
 
 def ackley_function(x):
     """
-    Ackley function given as $-20exp\[-0.2\sqrt{0.5(x^2+y^2)}\]-exp\[0.5(cos \pi x + cos \pi y) \]+e+20$
+    Ackley function given as $-20exp\[-0.2\sqrt{0.5(x^2+y^2)}\]-exp\[0.5(cos\pi x + cos \pi y) \]+e+20$
     with global minimum $f(0,0)=0$
     :param x: input list [x, y]
-    :return: value of ackley funcstion $f(x,y)$"
+    :return: value of Ackley function $f(x,y)$"
     """
     return -20 * np.exp(-0.2 * np.sqrt(x[0] ** 2 + x[1] ** 2)) \
            - np.exp(0.5 * (np.cos(2 * np.pi * x[0]) + np.cos(2 * np.pi * x[1]))) + np.e + 20
+
+
+def goldstein_price_function(x):
+    """
+    Goldstein-Price function given as $f(x,y)=[1 + (x+y+1)^2*(19-14x+3x^3-14y+6xy+3y^2)][30+(2x-3y)^2*(18-32x+12x^2+48y
+    -36xy+27y^2)]$
+    with global minimum $f(0,-1)=3$
+    :param x: input list [x, y]
+    :return: value of Goldstein-Price function $f(x,y)$
+    """
+    return (1 + (x[0] + x[1] + 1) ** 2 * (19 - 14 * x[0] + 3 * x[0] ** 2 - 14 * x[1] + 6 * x[0] * x[1] +
+                                          3 * x[1] ** 2)) * (30 + (2 * x[0] - 3 * x[1]) ** 2 *
+                                                             (18 - 32 * x[0] + 12 * x[0] ** 2 + 48 * x[1]
+                                                              - 36 * x[0] * x[1] + 27 * x[1] ** 2))
