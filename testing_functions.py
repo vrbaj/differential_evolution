@@ -47,7 +47,21 @@ def matyas_function(x):
     """
     Matyas function given as $f(x,y) = 0.26 * (x^2 + y^2) - 0.48 * x * y$
     with global minimum $f(0, 0) = 0$
-    :param x:
-    :return:
+    :param x: input list [x, y]
+    :return: the value of Matyas function f(x,y)
     """
     return 0.26 * (x[0] ** 2 + x[1] ** 2) - 0.48 * x[0] * x[1]
+
+
+def himmelblaus_function(x):
+    """
+    Himmelblaus function given as $f(x,y)=(x^2 + y - 11)^2 + (x + y^2 - 7)^2$
+    with global minimums:
+    $f(3,2) = 0$
+    $f(-2.805118, 3.131312) = 0$
+    $f(-3.779310, -3.283186) = 0$
+    $f(3.584428, -1.848126) = 0$
+    :param x: input list [x, y]
+    :return: the value of Himmelblaus function f(x,y)
+    """
+    return (x[0] ** 2 + x[1] - 11) ** 2 + (x[0] + x[1] ** 2 - 7) ** 2

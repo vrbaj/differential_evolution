@@ -17,6 +17,7 @@ Various standard testing and population diversity measurement functions are also
 - Beale function
 - Booth function
 - Matyas function
+- Himmelblau's function
 
 
 ## Implemented functions for population diversity estimation
