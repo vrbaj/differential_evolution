@@ -21,6 +21,7 @@ Various standard testing and population diversity measurement functions are also
 - Bukin function
 - McCormick function
 - Three-hump camel function
+- Ackley function
 
 
 ## Implemented functions for population diversity estimation

@@ -82,7 +82,7 @@ def mccormick_function(x):
     McCormick function given as $f(x,y)=sin(x+y) + (x-y)^2 - 1.5x + 2.5y + 1$
     with global minimum $f(-0.54719,-1.54719)=-1.9133$
     :param x: input list [x, y]
-    :return: value of McCormick function f(x,y)
+    :return: value of McCormick function $f(x,y)$
     """
     return np.sin(x[0] + x[1]) + (x[0] - x[1]) ** 2 - 1.5 * x[0] + 2.5 * x[1] + 1
 
@@ -92,6 +92,17 @@ def three_hump_camel_function(x):
     Three-hump camel function given as $f(x,y)=2x^2-1.05x^4+\frac{x^6}{6}+xy+y^2$
     with global minimum $f(0,0)=0$
     :param x: input list [x, y]
-    :return: value of three-hump camel function
+    :return: value of three-hump camel function $f(x,y)$
     """
     return 2 * x[0] - 1.05 * x[0] ** 4 + 1 / 6 * x[0] ** 6 + x[0] * x[1] + x[1] ** 2
+
+
+def ackley_function(x):
+    """
+    Ackley function given as $-20exp\[-0.2\sqrt{0.5(x^2+y^2)}\]-exp\[0.5(cos \pi x + cos \pi y) \]+e+20$
+    with global minimum $f(0,0)=0$
+    :param x: input list [x, y]
+    :return: value of ackley funcstion $f(x,y)$"
+    """
+    return -20 * np.exp(-0.2 * np.sqrt(x[0] ** 2 + x[1] ** 2)) \
+           - np.exp(0.5 * (np.cos(2 * np.pi * x[0]) + np.cos(2 * np.pi * x[1]))) + np.e + 20
