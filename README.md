@@ -1,6 +1,6 @@
 # Differential evolution algorithm
-This library aims to simplify the usage of differential evolution algorithm and enables efficiency comparison of various versions.
-Various standard testing function are also implemented.
+This library aims to simplify the usage of differential evolution algorithm and enables effective comparison of various versions.
+Various standard testing and population diversity measurement functions are also implemented 
 
 ## Implemented version of differential evolution
 - DE/rand/1
