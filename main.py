@@ -4,7 +4,8 @@ import numpy as np
 
 
 class DifferentialEvolution:
-    def __init__(self, cost_function, bounds, max_iterations, population_size, mutation, crossover, strategy):
+    def __init__(self, cost_function, bounds, max_iterations,
+                 population_size, mutation, crossover, strategy, population_initialization):
         self.cost_function = cost_function
         self.max_iterations = max_iterations
         self.population_size = population_size
@@ -18,7 +19,7 @@ class DifferentialEvolution:
         self.generation_best_individual_idx = None
         self.best_individual_history = []
         self.generation_fitness = []
-        self.initial_population = "random"
+        self.initial_population = population_initialization
 
     def initialize(self):
         if self.initial_population == "random":
@@ -40,8 +41,10 @@ class DifferentialEvolution:
 
                 population_ext.append(individual)
                 population_ext.append(opposite_individual)
-                population_ext.sort(key=self.cost_function)
-                self.population = population_ext[:self.population_size]
+            population_ext.sort(key=self.cost_function)
+            print(population_ext)
+            self.population = population_ext[:self.population_size]
+            print(self.population)
 
     def evolve(self):
         self.generation = 0
@@ -155,8 +158,8 @@ if __name__ == '__main__':
     from testing_functions import sphere_function as sphere_function
 
     diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-1.5, 4], [-3, 4]], max_iterations=100,
-                                           population_size=50,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/current-to-rand/1")
+                                           population_size=10,  mutation=[0.7, 0.7], crossover=0.7,
+                                           strategy="DE/current-to-rand/1", population_initialization="OBL")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best)
