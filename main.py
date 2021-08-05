@@ -42,9 +42,7 @@ class DifferentialEvolution:
                 population_ext.append(individual)
                 population_ext.append(opposite_individual)
             population_ext.sort(key=self.cost_function)
-            print(population_ext)
             self.population = population_ext[:self.population_size]
-            print(self.population)
 
     def evolve(self):
         self.generation = 0
