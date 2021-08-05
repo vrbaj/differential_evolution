@@ -18,13 +18,30 @@ class DifferentialEvolution:
         self.generation_best_individual_idx = None
         self.best_individual_history = []
         self.generation_fitness = []
+        self.initial_population = "random"
 
     def initialize(self):
-        for _ in range(self.population_size):
-            individual = []
-            for bound in self.bounds:
-                individual.append(np.random.uniform(bound[0], bound[1]))
-            self.population.append(individual)
+        if self.initial_population == "random":
+            for _ in range(self.population_size):
+                individual = []
+                for bound in self.bounds:
+                    individual.append(np.random.uniform(bound[0], bound[1]))
+                self.population.append(individual)
+        elif self.initial_population == "OBL":
+            # oppositional based learning
+            population_ext = []
+            for _ in range(self.population_size):
+                individual = []
+                opposite_individual = []
+                for bound in self.bounds:
+                    x_i = np.random.uniform(bound[0], bound[1])
+                    individual.append(x_i)
+                    opposite_individual.append(min(bound) + max(bound) - x_i)
+
+                population_ext.append(individual)
+                population_ext.append(opposite_individual)
+                population_ext.sort(key=self.cost_function)
+                self.population = population_ext[:self.population_size]
 
     def evolve(self):
         self.generation = 0
@@ -36,9 +53,10 @@ class DifferentialEvolution:
             for idx, individual in enumerate(self.population):
                 crossover_candidates = self.generate_crossover_candidates(idx)
                 new_individual = []
+                random_dimension = np.random.randint(0, len(individual))
                 for dimension in range(len(individual)):
                     cr = np.random.uniform(0, 1)
-                    if cr > self.crossover:
+                    if cr > self.crossover or random_dimension != dimension:
                         new_individual.append(individual[dimension])
                     else:
                         # check boundaries, if violation, random generate new one
@@ -134,7 +152,7 @@ def function_to_minimize(x):
 
 
 if __name__ == '__main__':
-    from testing_functions import mccormick_function as sphere_function
+    from testing_functions import sphere_function as sphere_function
 
     diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-1.5, 4], [-3, 4]], max_iterations=100,
                                            population_size=50,  mutation=[0.7, 0.7], crossover=0.7,
