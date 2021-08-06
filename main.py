@@ -54,6 +54,26 @@ class DifferentialEvolution:
                         x = 2 * (1 - x)
                     individual.append((bound[1] - bound[0]) * x + bound[0])
                 self.population.append(individual)
+        elif self.initial_population == "QOBL":
+            # quasi-oppositional differential evolution
+            population_ext = []
+            for _ in range(self.population_size):
+                individual = []
+                quasi_opposite_individual = []
+                for bound in self.bounds:
+                    x_i = np.random.uniform(bound[0], bound[1])
+                    individual.append(x_i)
+                    opposite_individual = min(bound) + max(bound) - x_i
+                    m = (min(bound) + max(bound)) / 2
+                    if x_i < m:
+                        quasi_opposite_individual.append(m + (opposite_individual - m) * np.random.uniform(0, 1))
+                    else:
+                        quasi_opposite_individual.append(opposite_individual + (m - opposite_individual) * np.random.uniform(0, 1))
+
+                population_ext.append(individual)
+                population_ext.append(quasi_opposite_individual)
+            population_ext.sort(key=self.cost_function)
+            self.population = population_ext[:self.population_size]
             print(self.population)
 
     def evolve(self):
@@ -167,9 +187,9 @@ def function_to_minimize(x):
 if __name__ == '__main__':
     from testing_functions import sphere_function as sphere_function
 
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-1.5, 1], [-3, 4]], max_iterations=100,
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-5, 5], [-5, 5]], max_iterations=100,
                                            population_size=10,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/current-to-rand/1", population_initialization="tent")
+                                           strategy="DE/current-to-rand/1", population_initialization="QOBL")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best)
