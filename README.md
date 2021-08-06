@@ -35,3 +35,4 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 ## Implemented initial generation
 - random
 - oppositional based learning
+- tent map

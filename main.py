@@ -43,6 +43,18 @@ class DifferentialEvolution:
                 population_ext.append(opposite_individual)
             population_ext.sort(key=self.cost_function)
             self.population = population_ext[:self.population_size]
+        elif self.initial_population == "tent":
+            x = np.random.uniform(0, 1)
+            for _ in range(self.population_size):
+                individual = []
+                for bound in self.bounds:
+                    if x < 0.5:
+                        x = 2 * x
+                    else:
+                        x = 2 * (1 - x)
+                    individual.append((bound[1] - bound[0]) * x + bound[0])
+                self.population.append(individual)
+            print(self.population)
 
     def evolve(self):
         self.generation = 0
@@ -155,9 +167,9 @@ def function_to_minimize(x):
 if __name__ == '__main__':
     from testing_functions import sphere_function as sphere_function
 
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-1.5, 4], [-3, 4]], max_iterations=100,
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-1.5, 1], [-3, 4]], max_iterations=100,
                                            population_size=10,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/current-to-rand/1", population_initialization="OBL")
+                                           strategy="DE/current-to-rand/1", population_initialization="tent")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best)
