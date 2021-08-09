@@ -186,9 +186,9 @@ def function_to_minimize(x):
 
 
 if __name__ == '__main__':
-    from testing_functions import eggholder_function as sphere_function
+    from testing_functions import schaffer_n2_function as sphere_function
 
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[400, 512], [400, 512]], max_iterations=100,
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-100, 100], [-100, 100]], max_iterations=100,
                                            population_size=1000,  mutation=[0.7, 0.7], crossover=0.7,
                                            strategy="DE/best/1", population_initialization="QOBL")
     diff_evolution.initialize()

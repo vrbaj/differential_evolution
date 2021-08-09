@@ -29,6 +29,8 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 - Goldstein-Price function
 - Lévi function n.13
 - Easom function
+- Eggholder function
+- Schaffer function n.2
 
 ## Implemented functions for population diversity estimation
 - standard deviation of fitness function
