@@ -138,6 +138,18 @@ def easom_function(x):
     Easom function given as $f(x,y)=-cos(x)cos(y)exp(-((x-\pi)^2 + (y-\pi)^2))$
     with global minimum $f(\pi,\pi)=-1$
     :param x: input list [x, y]
-    :return: value of easom function $f(x,y)$
+    :return: value of Easom function $f(x,y)$
     """
     return -np.cos(x[0]) * np.cos(x[1]) * np.exp(-((x[0] - np.pi) ** 2 + (x[1] - np.pi) ** 2))
+
+
+def eggholder_function(x):
+    """
+    Eggholder function given as $f(x,y)=-(y+47)sin(\sqrt{\lvert| \frac{x}{2}+(y+47)\rvert|})
+    - x sin(\sqrt{\lvert| x-(y+47)})$
+    with global minimum f(512,404.2319)=-959.6407
+    :param x: input list [x, y]
+    :return: value of Eggholder function $f(x,y)$
+    """
+    return -(x[1] + 47) * np.sin(np.sqrt(np.abs(x[0] / 2 + (x[1] + 47)))) \
+           - x[0] * np.sin(np.sqrt(np.abs(x[0] - (x[1] + 47))))

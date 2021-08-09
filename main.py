@@ -74,7 +74,7 @@ class DifferentialEvolution:
                 population_ext.append(quasi_opposite_individual)
             population_ext.sort(key=self.cost_function)
             self.population = population_ext[:self.population_size]
-            print(self.population)
+            # print(self.population)
 
     def evolve(self):
         self.generation = 0
@@ -94,6 +94,7 @@ class DifferentialEvolution:
                     else:
                         # check boundaries, if violation, random generate new one
                         new_individual.append(self.mutate(crossover_candidates, dimension))
+
                 if self.cost_function(new_individual) < self.cost_function(individual):
                     self.population[idx] = new_individual
                 self.generation_fitness.append(self.cost_function(self.population[idx]))
@@ -128,13 +129,13 @@ class DifferentialEvolution:
     def mutate(self, crossover_candidates, dimension):
         if self.strategy == "DE/rand/1" or self.strategy == "DE/best/1":
             return self.population[crossover_candidates[0]][dimension] + \
-                   self.mutation * (self.population[crossover_candidates[1]][dimension] -
+                   self.mutation[0] * (self.population[crossover_candidates[1]][dimension] -
                                     self.population[crossover_candidates[2]][dimension])
         elif self.strategy == "DE/rand/2" or self.strategy == "DE/best/2":
             return self.population[crossover_candidates[0]][dimension] + \
-                   self.mutation * (self.population[crossover_candidates[1]][dimension] -
+                   self.mutation[0] * (self.population[crossover_candidates[1]][dimension] -
                                     self.population[crossover_candidates[2]][dimension]) + \
-                   self.mutation * (self.population[crossover_candidates[3]][dimension] -
+                   self.mutation[0] * (self.population[crossover_candidates[3]][dimension] -
                                     self.population[crossover_candidates[4]][dimension])
         elif self.strategy == "DE/current-to-best/1":
             return self.population[crossover_candidates[1]][dimension] + \
@@ -185,17 +186,17 @@ def function_to_minimize(x):
 
 
 if __name__ == '__main__':
-    from testing_functions import sphere_function as sphere_function
+    from testing_functions import eggholder_function as sphere_function
 
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-5, 5], [-5, 5]], max_iterations=100,
-                                           population_size=10,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/current-to-rand/1", population_initialization="QOBL")
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[400, 512], [400, 512]], max_iterations=100,
+                                           population_size=1000,  mutation=[0.7, 0.7], crossover=0.7,
+                                           strategy="DE/best/1", population_initialization="QOBL")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best)
     fig, (ax1, ax2) = plt.subplots(2)
     fig.suptitle("Error")
-    optimal_value = [0, 0]
+    optimal_value = [512, 404.2319]
     ax1.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(0)) - optimal_value[0])))
     ax2.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(1)) - optimal_value[1])))
     plt.show()
