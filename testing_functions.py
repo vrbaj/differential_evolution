@@ -132,3 +132,12 @@ def levi_function(x):
     return np.sin(3 * np.pi * x[0]) ** 2 + (x[0] - 1) ** 2 * (1 + np.sin(3 * np.pi * x[1]) ** 2)\
                                          + (1 - x[1]) ** 2 * (1 + np.sin(2 * np.pi * x[1]) ** 2)
 
+
+def easom_function(x):
+    """
+    Easom function given as $f(x,y)=-cos(x)cos(y)exp(-((x-\pi)^2 + (y-\pi)^2))$
+    with global minimum $f(\pi,\pi)=-1$
+    :param x: input list [x, y]
+    :return: value of easom function $f(x,y)$
+    """
+    return -np.cos(x[0]) * np.cos(x[1]) * np.exp(-((x[0] - np.pi) ** 2 + (x[1] - np.pi) ** 2))
