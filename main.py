@@ -74,7 +74,44 @@ class DifferentialEvolution:
                 population_ext.append(quasi_opposite_individual)
             population_ext.sort(key=self.cost_function)
             self.population = population_ext[:self.population_size]
-            # print(self.population)
+        elif self.initial_population == "sobol":
+            polynomial_coefficients = [0, 1]
+            # generate m_i
+            m = [1, 3, 7]
+            for i in range(3, self.population_size + 1):
+                m_i = 2 * polynomial_coefficients[0] * m[i - 1] ^ 2 ** 2 * polynomial_coefficients[1] * m[i - 2] ^ \
+                2 ** 3 * m[i - 3] ^ m[i - 3]
+                m.append(m_i)
+            # generate v_i
+            v = []
+            for idx, m_i in enumerate(m):
+                bin_repr = bin(m_i)[2:]
+                while len(bin_repr) < idx + 1:
+                    bin_repr = "0" + bin_repr
+                v.append(bin_repr)
+            # add zeros to v_i and 0.
+            w = []
+            for v_i in v:
+                # while len(v_i) < len(v[-1]):
+                #     v_i = "0" + v_i
+                v_i = "0." + v_i
+                w.append(v_i)
+            zero_string = "0." + (len(w[0]) - 2) * "0"
+            for individual in range(1, self.population_size + 1):
+                bv = []
+                for idx, bit in enumerate(reversed(bin(individual)[2:])):
+                    if bit == "0":
+                        bv.append(zero_string)
+                    else:
+                        bv.append(w[idx])
+                self.population.append(my_xor(bv))
+
+
+
+
+
+
+
 
     def evolve(self):
         self.generation = 0
@@ -185,12 +222,45 @@ def function_to_minimize(x):
     return x[0] ** 2 + x[1] ** 2
 
 
+def my_xor(bv):
+    binary_reps = []
+    max_len = 0
+    print("original bv: ", bv)
+    for item in bv:
+        if len(item) > max_len:
+            max_len = len(item)
+    for idx, item in enumerate(bv):
+        while len(item) < max_len:
+            item = item + "0"
+        bv[idx] = item
+    print("ext bv: ", bv)
+    for item in bv:
+        binary_reps.append(int(item[2:], 2))
+
+    # xor
+    for index in range(1, len(bv)):
+        new_bv = []
+        for letter_idx, letter in enumerate(bv[index]):
+            if bv[index][letter_idx] == ".":
+                new_bv.append(".")
+            else:
+                if bv[index][letter_idx] == bv[index - 1][letter_idx]:
+                    new_bv.append("0")
+                else:
+                    new_bv.append("1")
+        bv[index] = new_bv
+    individual = 0
+    for exponent, item in enumerate("".join(bv[-1]).replace(".", "")):
+        individual = individual + int(item) * 1 / (2 ** exponent)
+    return individual
+
+
 if __name__ == '__main__':
     from testing_functions import schaffer_n2_function as sphere_function
 
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-100, 100], [-100, 100]], max_iterations=100,
-                                           population_size=1000,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/best/1", population_initialization="QOBL")
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-100, 100], [-100, 100]], max_iterations=2,
+                                           population_size=24,  mutation=[0.7, 0.7], crossover=0.7,
+                                           strategy="DE/best/1", population_initialization="sobol")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best)

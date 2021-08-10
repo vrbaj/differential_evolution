@@ -40,3 +40,4 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 - oppositional based learning 
 - tent map
 - quasi-oppositional based learning
+- Sobol's pseudo-random sequence
