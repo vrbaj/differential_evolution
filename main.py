@@ -225,7 +225,6 @@ def function_to_minimize(x):
 def my_xor(bv):
     binary_reps = []
     max_len = 0
-    print("original bv: ", bv)
     for item in bv:
         if len(item) > max_len:
             max_len = len(item)
@@ -233,10 +232,8 @@ def my_xor(bv):
         while len(item) < max_len:
             item = item + "0"
         bv[idx] = item
-    print("ext bv: ", bv)
     for item in bv:
         binary_reps.append(int(item[2:], 2))
-
     # xor
     for index in range(1, len(bv)):
         new_bv = []
