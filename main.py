@@ -1,6 +1,7 @@
 from random import sample
 from matplotlib import pyplot as plt
 import numpy as np
+import population_initialization
 
 
 class DifferentialEvolution:
@@ -23,11 +24,7 @@ class DifferentialEvolution:
 
     def initialize(self):
         if self.initial_population == "random":
-            for _ in range(self.population_size):
-                individual = []
-                for bound in self.bounds:
-                    individual.append(np.random.uniform(bound[0], bound[1]))
-                self.population.append(individual)
+            self.population = population_initialization.random_initialization(self.population_size, self.bounds)
         elif self.initial_population == "OBL":
             # oppositional based learning
             population_ext = []
@@ -44,16 +41,7 @@ class DifferentialEvolution:
             population_ext.sort(key=self.cost_function)
             self.population = population_ext[:self.population_size]
         elif self.initial_population == "tent":
-            x = np.random.uniform(0, 1)
-            for _ in range(self.population_size):
-                individual = []
-                for bound in self.bounds:
-                    if x < 0.5:
-                        x = 2 * x
-                    else:
-                        x = 2 * (1 - x)
-                    individual.append((bound[1] - bound[0]) * x + bound[0])
-                self.population.append(individual)
+            self.population = population_initialization.tent_initialization(self.population_size, self.bounds)
         elif self.initial_population == "QOBL":
             # quasi-oppositional differential evolution
             population_ext = []
@@ -75,6 +63,7 @@ class DifferentialEvolution:
             population_ext.sort(key=self.cost_function)
             self.population = population_ext[:self.population_size]
         elif self.initial_population == "sobol":
+            # TODO various polynomials, various m numbers
             polynomial_coefficients = [0, 1]
             # generate m_i
             m = [1, 3, 7]
@@ -92,8 +81,6 @@ class DifferentialEvolution:
             # add zeros to v_i and 0.
             w = []
             for v_i in v:
-                # while len(v_i) < len(v[-1]):
-                #     v_i = "0" + v_i
                 v_i = "0." + v_i
                 w.append(v_i)
             zero_string = "0." + (len(w[0]) - 2) * "0"
@@ -105,13 +92,6 @@ class DifferentialEvolution:
                     else:
                         bv.append(w[idx])
                 self.population.append([my_xor(bv)] * len(self.bounds))
-
-
-
-
-
-
-
 
     def evolve(self):
         self.generation = 0
@@ -247,17 +227,16 @@ def my_xor(bv):
 
 
 if __name__ == '__main__':
-    from testing_functions import schaffer_n2_function as sphere_function
-
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-100, 100], [-100, 100]], max_iterations=10,
+    from testing_functions import sphere_function as sphere_function
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-100, 100], [-100, 100]], max_iterations=100,
                                            population_size=24,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/best/1", population_initialization="sobol")
+                                           strategy="DE/best/1", population_initialization="tent")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best)
     fig, (ax1, ax2) = plt.subplots(2)
     fig.suptitle("Error")
-    optimal_value = [512, 404.2319]
+    optimal_value = [0, 0]
     ax1.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(0)) - optimal_value[0])))
     ax2.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(1)) - optimal_value[1])))
     plt.show()
