@@ -104,7 +104,7 @@ class DifferentialEvolution:
                         bv.append(zero_string)
                     else:
                         bv.append(w[idx])
-                self.population.append(my_xor(bv))
+                self.population.append([my_xor(bv)] * len(self.bounds))
 
 
 
@@ -224,14 +224,8 @@ def function_to_minimize(x):
 
 def my_xor(bv):
     binary_reps = []
-    max_len = 0
-    for item in bv:
-        if len(item) > max_len:
-            max_len = len(item)
-    for idx, item in enumerate(bv):
-        while len(item) < max_len:
-            item = item + "0"
-        bv[idx] = item
+    max_len = max(len(x) for x in bv)
+    bv = [x + (max_len - len(x)) * "0" for x in bv]
     for item in bv:
         binary_reps.append(int(item[2:], 2))
     # xor
@@ -255,7 +249,7 @@ def my_xor(bv):
 if __name__ == '__main__':
     from testing_functions import schaffer_n2_function as sphere_function
 
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-100, 100], [-100, 100]], max_iterations=2,
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-100, 100], [-100, 100]], max_iterations=10,
                                            population_size=24,  mutation=[0.7, 0.7], crossover=0.7,
                                            strategy="DE/best/1", population_initialization="sobol")
     diff_evolution.initialize()
