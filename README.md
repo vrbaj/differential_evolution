@@ -53,3 +53,4 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 - population size reduction
 - scale factor golden section search
 - some self-adapting parameters schemes
+- exponential crossover
