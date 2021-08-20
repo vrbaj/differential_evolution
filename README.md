@@ -13,6 +13,7 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 - DE/current-to-rand/1
 - DE/current-to-rand/2
 
+
 ## Implemented crossover 
 - binomial
 
@@ -42,3 +43,13 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 - tent map
 - quasi-oppositional based learning
 - Sobol's pseudo-random sequence
+
+## Will be implemented soon
+- randomized F 
+- adaptively updated F
+- Neighborhood Search Differential Evolution
+- trigonometric mutation
+- directed mutation
+- population size reduction
+- scale factor golden section search
+- some self-adapting parameters schemes
