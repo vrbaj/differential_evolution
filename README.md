@@ -11,6 +11,7 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 - DE/current-to-best/1
 - DE/current-to-best/2
 - DE/current-to-rand/1
+- DE/current-to-rand/2
 
 ## Implemented crossover 
 - binomial

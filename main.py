@@ -86,6 +86,9 @@ class DifferentialEvolution:
         elif self.strategy == "DE/current-to-rand/1":
             crossover_candidates[0] = idx
             return crossover_candidates[:4]
+        elif self.strategy == "DE/current-to-rand/2":
+            crossover_candidates[0] = idx
+            return crossover_candidates[:6]
 
     def mutate(self, crossover_candidates, dimension):
         if self.strategy == "DE/rand/1" or self.strategy == "DE/best/1":
@@ -118,6 +121,14 @@ class DifferentialEvolution:
                                        self.population[crossover_candidates[0]][dimension]) + \
                    self.mutation[1] * (self.population[crossover_candidates[2]][dimension] -
                                        self.population[crossover_candidates[3]][dimension])
+        elif self.strategy == "DE/current-to-rand/2":
+            return self.population[crossover_candidates[0]][dimension] + \
+                   self.mutation[0] * (self.population[crossover_candidates[1]][dimension] -
+                                       self.population[crossover_candidates[0]][dimension]) + \
+                   self.mutation[1] * (self.population[crossover_candidates[2]][dimension] -
+                                       self.population[crossover_candidates[3]][dimension]) + \
+                   self.mutation[1] * (self.population[crossover_candidates[4]][dimension] -
+                                       self.population[crossover_candidates[5]][dimension])
 
     def get_best(self):
         best_cost = np.inf
@@ -150,7 +161,7 @@ if __name__ == '__main__':
     from testing_functions import sphere_function as sphere_function
     diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-5, 5.1], [-5.1, 5]], max_iterations=100,
                                            population_size=17,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/best/1", population_initialization_algorithm="sobol")
+                                           strategy="DE/current-to-rand/2", population_initialization_algorithm="sobol")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best())
