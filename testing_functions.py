@@ -164,3 +164,19 @@ def schaffer_n2_function(x):
     """
     return 0.5 + (np.sin(x[0] ** 2 + x[1] ** 2) ** 2 - 0.5) / (1 + 0.001 * (x[0] ** 2 + x[1] ** 2)) ** 2
 
+
+def gpd_ll_function(x):
+    """
+    Log-likelihood function of Generalized Pareto distribution.
+    :param x: input list [scale, shape, location]
+    :return: value of log-likelihood function
+    """
+    scale = x[0]
+    shape = x[1]
+    location = x[2]
+    data = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    log_sum = 0
+    for item in data:
+        log_sum = log_sum + np.log10(1 - shape/scale * (item - location))
+    ll = -1 * len(data) * np.log10(scale) + (1 - shape) / shape * log_sum
+    return ll

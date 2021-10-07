@@ -158,10 +158,10 @@ def function_to_minimize(x):
 
 
 if __name__ == '__main__':
-    from testing_functions import sphere_function as sphere_function
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-5, 5.1], [-5.1, 5]], max_iterations=100,
-                                           population_size=17,  mutation=[0.7, 0.7], crossover=0.7,
-                                           strategy="DE/current-to-rand/2", population_initialization_algorithm="sobol")
+    from testing_functions import gpd_ll_function as sphere_function
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-2, 2], [-2, 2], [-2, 1]], max_iterations=1000,
+                                           population_size=100,  mutation=[0.7, 0.7, 0.7], crossover=0.7,
+                                           strategy="DE/current-to-rand/2", population_initialization_algorithm="random")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best())
