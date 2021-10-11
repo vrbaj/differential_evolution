@@ -1,3 +1,4 @@
+import pickle
 import numpy as np
 
 
@@ -173,10 +174,12 @@ def gpd_ll_function(x):
     """
     scale = x[0]
     shape = x[1]
-    location = x[2]
-    data = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    theta = shape / scale
+    # location = x[2]
+    dbfile = open('gpd_sample', 'rb')
+    data = pickle.load(dbfile)
+    dbfile.close()
     log_sum = 0
     for item in data:
-        log_sum = log_sum + np.log10(1 - shape/scale * (item - location))
-    ll = -1 * len(data) * np.log10(scale) + (1 - shape) / shape * log_sum
-    return ll
+        log_sum = log_sum + np.log(theta / shape) - (1 + 1/shape)*np.log(1 + theta * item)
+    return -1 * log_sum

@@ -59,7 +59,9 @@ class DifferentialEvolution:
                 if self.cost_function(new_individual) < self.cost_function(individual):
                     self.population[idx] = new_individual
                 self.generation_fitness.append(self.cost_function(self.population[idx]))
-                # measure diversity here?
+            if self.generation % 10 == 0:
+                print("generation: ", self.generation, ", best solution:", self.get_best())
+            # measure diversity here?
 
     def generate_crossover_candidates(self, idx):
         crossover_candidates = [idx]
@@ -159,15 +161,15 @@ def function_to_minimize(x):
 
 if __name__ == '__main__':
     from testing_functions import gpd_ll_function as sphere_function
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-2, 2], [-2, 2], [-2, 1]], max_iterations=1000,
-                                           population_size=100,  mutation=[0.7, 0.7, 0.7], crossover=0.7,
-                                           strategy="DE/current-to-rand/2", population_initialization_algorithm="random")
+    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-2, 2], [-2, 2]], max_iterations=100,
+                                           population_size=1000,  mutation=[0.8, 0.8, 0.5], crossover=0.3,
+                                           strategy="DE/current-to-best/1", population_initialization_algorithm="random")
     diff_evolution.initialize()
     diff_evolution.evolve()
     print("the best solution: ", diff_evolution.get_best())
     fig, (ax1, ax2) = plt.subplots(2)
     fig.suptitle("Error")
-    optimal_value = [0, 0]
+    optimal_value = [1, -1]
     ax1.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(0)) - optimal_value[0])))
     ax2.plot(np.log10(np.abs(np.asarray(diff_evolution.filter_history(1)) - optimal_value[1])))
     plt.show()
