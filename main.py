@@ -161,8 +161,8 @@ def function_to_minimize(x):
 
 if __name__ == '__main__':
     from testing_functions import gpd_ll_function as sphere_function
-    diff_evolution = DifferentialEvolution(sphere_function, bounds=[[-2, 2], [-2, 2]], max_iterations=100,
-                                           population_size=1000,  mutation=[0.8, 0.8, 0.5], crossover=0.3,
+    diff_evolution = DifferentialEvolution(function_to_minimize, bounds=[[-2, 2], [-2, 2]], max_iterations=100,
+                                           population_size=1000,  mutation=[0.8, 0.8, 0.5], crossover=0.5,
                                            strategy="DE/current-to-best/1", population_initialization_algorithm="random")
     diff_evolution.initialize()
     diff_evolution.evolve()

@@ -54,3 +54,4 @@ Only binomial crossover is implemented so far, exponential crossover will be imp
 - scale factor golden section search
 - some self-adapting parameters schemes
 - exponential crossover
+- plotting testing functions
