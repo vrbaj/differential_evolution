@@ -1,0 +1,3 @@
+Sphinx>=8,<9
+sphinxcontrib-bibtex>=2.6,<3
+sphinx-rtd-theme>=3,<4

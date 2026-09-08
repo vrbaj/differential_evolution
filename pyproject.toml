@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "differential-evolution"
+version = "0.1.0"
+description = "Composable Differential Evolution optimizer"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Honza" }]
+license = { text = "MIT" }
+
+[project.optional-dependencies]
+docs = [
+    "Sphinx>=8,<9",
+    "sphinxcontrib-bibtex>=2.6,<3",
+    "sphinx-rtd-theme>=3,<4",
+]
+
+[tool.setuptools.packages.find]
+include = ["differential_evolution*"]

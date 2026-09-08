@@ -1,0 +1,17 @@
+# Project exclude paths
+/venv/
+
+# Local environments and tools
+.venv*/
+docs-venv/
+.docdeps/
+.idea/
+
+# Python caches and documentation build output
+__pycache__/
+*.py[cod]
+.pytest_cache/
+docs/_build/
+
+# Accidental shell output
+/=8,

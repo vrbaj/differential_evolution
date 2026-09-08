@@ -1,0 +1,7 @@
+code.literal {
+  white-space: nowrap;
+}
+
+.math {
+  overflow-x: auto;
+}
