@@ -2,18 +2,29 @@
 
 from __future__ import annotations
 
+from .protocols import RandomSource
+
 import math
 import random
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Callable
 
-from .diversity import resolve_diversity_measures
-from .boundaries import Bounds, NoBoundaryHandler
-from .crossovers import IdentityCrossover
+from .diversity import (
+    DiversityMeasure,
+    resolve_diversity_measures,
+    _pairwise_distances,
+    PopulationDiameter,
+    AveragePairwiseDistance,
+    AverageDistanceAroundAllIndividuals,
+)
+from collections.abc import Iterable
+from .boundaries import BoundaryHandler, ClipBoundaryHandler
+from .crossovers import CrossoverOperator, IdentityCrossover
 from .history import GenerationSnapshot
-from .initializers import RandomInitializer
-from .mutation import MutationContext
-from .population_schedules import PopulationScheduleState
+from .initializers import PopulationInitializer, RandomInitializer
+from .mutation import MutationContext, MutationOperator
+from .population_schedules import PopulationSchedule, PopulationScheduleState
 from .result import OptimizeResult
 
 
@@ -29,7 +40,7 @@ class DifferentialEvolution:
     objective
         Objective function to minimize. It receives one candidate vector and
         must return one scalar fitness value. Non-finite return values are
-        treated as ``math.inf``.
+        treated as ``math.inf`` except negative infinity, which is preserved.
     bounds
         Coordinate-wise search bounds as ``(lower, upper)`` pairs.
     population_size
@@ -70,17 +81,21 @@ class DifferentialEvolution:
     objective: ObjectiveFunction
     bounds: list[tuple[float, float]]
     population_size: int
-    mutation: object
-    crossover: object = field(default_factory=IdentityCrossover)
+    mutation: MutationOperator
+    crossover: CrossoverOperator = field(default_factory=IdentityCrossover)
     max_generations: int = 100
-    initializer: object = field(default_factory=RandomInitializer)
-    boundary_handler: object = field(default_factory=NoBoundaryHandler)
-    diversity_measures: object = None
-    population_schedule: object | None = None
+    initializer: PopulationInitializer = field(default_factory=RandomInitializer)
+    boundary_handler: BoundaryHandler = field(default_factory=ClipBoundaryHandler)
+    diversity_measures: (
+        str | DiversityMeasure | Iterable[str | DiversityMeasure] | None
+    ) = None
+    population_schedule: PopulationSchedule | None = None
     max_evaluations: int | None = None
     record_snapshots: bool = False
+    snapshot_interval: int = 1
+    objective_errors: str = "raise"
     seed: int | None = None
-    rng: object | None = None
+    rng: RandomSource | None = None
 
     def __post_init__(self) -> None:
         if self.population_size < 3:
@@ -92,11 +107,34 @@ class DifferentialEvolution:
         if self.max_evaluations is not None and self.max_evaluations <= 0:
             raise ValueError("max_evaluations must be positive when provided.")
         for lower, upper in self.bounds:
-            if lower > upper:
+            if not math.isfinite(lower) or not math.isfinite(upper) or lower > upper:
                 raise ValueError("Each bound must satisfy lower <= upper.")
         if self.seed is not None and self.rng is not None:
             raise ValueError("Pass either seed or rng, not both.")
 
+        if self.snapshot_interval < 1:
+            raise ValueError("snapshot_interval must be positive.")
+        if self.objective_errors not in ("raise", "penalize"):
+            raise ValueError("objective_errors must be raise or penalize.")
+        required = getattr(self.mutation, "required_population_size", 1)
+        if self.population_size < required:
+            raise ValueError(
+                f"{type(self.mutation).__name__} requires population_size at least {required}."
+            )
+        if (
+            self.population_schedule is not None
+            and self.population_schedule.min_population_size < required
+        ):
+            raise ValueError(
+                f"Population schedule must retain at least {required} individuals."
+            )
+        if (
+            self.max_evaluations is not None
+            and self.max_evaluations < self.population_size
+        ):
+            raise ValueError("max_evaluations must cover the initial population.")
+        self.mutation, self.crossover = deepcopy((self.mutation, self.crossover))
+        self._has_run = False
         self._rng = self.rng if self.rng is not None else random.Random(self.seed)
         if hasattr(self.mutation, "initialize"):
             self.mutation.initialize(self.population_size, self._rng)
@@ -121,18 +159,35 @@ class DifferentialEvolution:
 
         Some initializers rank candidate points by objective value before the
         final population is chosen. In those cases, initialization consumes
-        extra objective evaluations before the retained population is evaluated
-        again by the optimizer.
+        extra objective evaluations; retained candidate fitness is reused.
+        Initialization raises before exceeding max_evaluations if the budget
+        cannot cover the initializer's candidate pool.
         """
+
+        if self.population:
+            raise RuntimeError(
+                "This optimizer is already initialized; create a new instance to restart."
+            )
+        evaluated = {}
+
+        def evaluate_initial(vector):
+            key = tuple(vector)
+            evaluated[key] = self._evaluate_vector(vector)
+            return evaluated[key]
 
         self.population = self.initializer(
             self.population_size,
             self.bounds,
-            self._evaluate_vector,
+            evaluate_initial,
             self._rng,
         )
         self._validate_population(self.population)
-        self.fitness = [self._evaluate_vector(individual) for individual in self.population]
+        self.fitness = [
+            evaluated[tuple(individual)]
+            if tuple(individual) in evaluated
+            else self._evaluate_vector(individual)
+            for individual in self.population
+        ]
         self._record_best()
         self._record_diversity(previous_population=None)
         self.population_size_history.append(self.population_size)
@@ -148,6 +203,10 @@ class DifferentialEvolution:
             optional snapshots.
         """
 
+        if self._has_run:
+            raise RuntimeError(
+                "run() has already completed; create a new optimizer to restart."
+            )
         if not self.population:
             self.initialize()
 
@@ -158,23 +217,39 @@ class DifferentialEvolution:
             if processed == 0:
                 break
 
+        self._has_run = True
         best_index = self._best_index(self.fitness)
+        reason = (
+            "max_evaluations"
+            if self.max_evaluations is not None and self.nfev >= self.max_evaluations
+            else "max_generations"
+        )
+        finite_solution = self.fitness[best_index] < math.inf
         return OptimizeResult(
             x=list(self.population[best_index]),
             fun=self.fitness[best_index],
             nit=self.nit,
             nfev=self.nfev,
-            success=True,
-            message="Optimization finished after reaching max_generations.",
+            success=finite_solution,
+            message=f"Optimization finished after reaching {reason}."
+            if finite_solution
+            else f"No feasible solution found before {reason}.",
             population=[list(individual) for individual in self.population],
             fitness=list(self.fitness),
             best_history=[list(vector) for vector in self.best_history],
             best_fitness_history=list(self.best_fitness_history),
-            diversity_history={name: list(values) for name, values in self.diversity_history.items()},
+            diversity_history={
+                name: list(values) for name, values in self.diversity_history.items()
+            },
             population_size_history=list(self.population_size_history),
             snapshots=list(self.snapshots),
             metadata=self._result_metadata(),
         )
+
+    @property
+    def current_population_size(self) -> int:
+        """Current population size; population_size remains the initial configuration."""
+        return len(self.population) if self.population else self.population_size
 
     def _step(self) -> int:
         population_snapshot = [list(individual) for individual in self.population]
@@ -202,7 +277,7 @@ class DifferentialEvolution:
                 self.crossover.set_target_index(target_index)
             donor_vector = self.mutation(context)
             trial_vector = self.crossover(target_vector, donor_vector, self._rng)
-            bounded_trial = self.boundary_handler(trial_vector, self.bounds, self._rng)
+            bounded_trial = self._repair_trial(trial_vector, target_vector)
             trial_fitness = self._evaluate_vector(bounded_trial)
             accepted = trial_fitness < fitness_snapshot[target_index]
             if accepted:
@@ -219,7 +294,6 @@ class DifferentialEvolution:
 
         self.population = next_population
         self.fitness = next_fitness
-        self.population_size = len(self.population)
         self.nit += 1
         kept_indices = self._apply_population_schedule()
         self._record_best()
@@ -227,9 +301,18 @@ class DifferentialEvolution:
         if kept_indices is not None:
             previous_population = [population_snapshot[index] for index in kept_indices]
         self._record_diversity(previous_population=previous_population)
-        self.population_size_history.append(self.population_size)
+        self.population_size_history.append(self.current_population_size)
         self._record_snapshot()
         return processed_targets
+
+    def _repair_trial(self, trial_vector, target_vector):
+        if len(trial_vector) != len(self.bounds):
+            raise ValueError("Trial dimension does not match bounds.")
+        if hasattr(self.boundary_handler, "repair"):
+            return self.boundary_handler.repair(
+                trial_vector, target_vector, self.bounds, self._rng
+            )
+        return self.boundary_handler(trial_vector, self.bounds, self._rng)
 
     def _record_best(self) -> None:
         best_index = self._best_index(self.fitness)
@@ -237,24 +320,40 @@ class DifferentialEvolution:
         self.best_fitness_history.append(self.fitness[best_index])
 
     def _record_diversity(self, previous_population: list[list[float]] | None) -> None:
+        shared = {}
+        pairwise_types = (
+            PopulationDiameter,
+            AveragePairwiseDistance,
+            AverageDistanceAroundAllIndividuals,
+        )
+        if any(type(measure) in pairwise_types for measure in self._diversity_measures):
+            distances = _pairwise_distances(self.population)
+            total = sum(distances)
+            count = len(self.population)
+            shared = {
+                PopulationDiameter: max(distances, default=0.0),
+                AveragePairwiseDistance: total / len(distances) if distances else 0.0,
+                AverageDistanceAroundAllIndividuals: 2 * total / (count * count),
+            }
         for measure in self._diversity_measures:
-            self.diversity_history[measure.name].append(
-                measure(
+            value = shared.get(type(measure))
+            if value is None:
+                value = measure(
                     population=self.population,
                     bounds=self.bounds,
                     previous_population=previous_population,
                 )
-            )
+            self.diversity_history[measure.name].append(value)
 
     def _record_snapshot(self) -> None:
-        if not self.record_snapshots:
+        if not self.record_snapshots or self.nit % self.snapshot_interval:
             return None
         best_index = self._best_index(self.fitness)
         self.snapshots.append(
             GenerationSnapshot(
                 generation=self.nit,
                 evaluations=self.nfev,
-                population_size=self.population_size,
+                population_size=self.current_population_size,
                 best_vector=list(self.population[best_index]),
                 best_fitness=self.fitness[best_index],
                 population=[list(individual) for individual in self.population],
@@ -273,7 +372,13 @@ class DifferentialEvolution:
         return {}
 
     def _result_metadata(self) -> dict[str, object]:
-        return {"algorithm": self.__class__.__name__}
+        return {
+            "algorithm": self.__class__.__name__,
+            "mutation_fallbacks": getattr(self.mutation, "fallback_count", 0),
+            "termination_reason": "max_evaluations"
+            if self.max_evaluations is not None and self.nfev >= self.max_evaluations
+            else "max_generations",
+        }
 
     def _apply_population_schedule(self) -> list[int] | None:
         if self.population_schedule is None:
@@ -285,19 +390,18 @@ class DifferentialEvolution:
                 evaluations=self.nfev,
                 max_evaluations=self.max_evaluations,
                 initial_population_size=self._initial_population_size,
-                current_population_size=self.population_size,
+                current_population_size=self.current_population_size,
                 min_population_size=self.population_schedule.min_population_size,
             )
         )
-        if target_size >= self.population_size:
+        if target_size >= self.current_population_size:
             return None
         kept_indices = sorted(
-            range(self.population_size),
+            range(self.current_population_size),
             key=lambda index: self.fitness[index],
         )[:target_size]
         self.population = [self.population[index] for index in kept_indices]
         self.fitness = [self.fitness[index] for index in kept_indices]
-        self.population_size = target_size
         if hasattr(self.mutation, "resize"):
             self.mutation.resize(kept_indices)
         if hasattr(self.crossover, "resize"):
@@ -307,9 +411,18 @@ class DifferentialEvolution:
     def _evaluate_vector(self, vector: list[float]) -> float:
         if len(vector) != len(self.bounds):
             raise ValueError("Objective input dimension does not match bounds.")
-        value = float(self.objective(list(vector)))
+        if self.max_evaluations is not None and self.nfev >= self.max_evaluations:
+            raise ValueError(
+                "max_evaluations exhausted during initialization; increase the budget for this initializer."
+            )
         self.nfev += 1
-        if math.isnan(value) or math.isinf(value):
+        try:
+            value = float(self.objective(list(vector)))
+        except (ValueError, ArithmeticError):
+            if self.objective_errors == "raise":
+                raise
+            return math.inf
+        if math.isnan(value):
             return math.inf
         return value
 
@@ -322,4 +435,6 @@ class DifferentialEvolution:
             raise ValueError("Initializer returned the wrong population size.")
         for individual in population:
             if len(individual) != len(self.bounds):
-                raise ValueError("Initializer returned an individual with the wrong dimension.")
+                raise ValueError(
+                    "Initializer returned an individual with the wrong dimension."
+                )

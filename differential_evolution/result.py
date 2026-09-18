@@ -6,7 +6,7 @@ from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .history import GenerationSnapshot, save_json, save_pickle, snapshots_to_dicts
+from .history import GenerationSnapshot, save_json, save_pickle
 
 
 @dataclass(frozen=True)
@@ -35,9 +35,7 @@ class OptimizeResult:
     def to_dict(self) -> dict[str, Any]:
         """Return a plain serializable dictionary."""
 
-        result = asdict(self)
-        result["snapshots"] = snapshots_to_dicts(self.snapshots)
-        return result
+        return asdict(self)
 
     def save_json(self, path: str | Path) -> None:
         """Save the full result as JSON."""

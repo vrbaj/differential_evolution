@@ -38,7 +38,9 @@ def _resolve_initializer(name: str) -> object:
     try:
         return mapping[name]
     except KeyError as error:
-        raise ValueError(f"Unknown population initialization algorithm: {name!r}") from error
+        raise ValueError(
+            f"Unknown population initialization algorithm: {name!r}"
+        ) from error
 
 
 def _resolve_mutation(strategy: str, mutation: list[float]) -> object:
@@ -111,7 +113,9 @@ class DifferentialEvolution:
 
     def initialize(self):
         self._optimizer.initialize()
-        self.population = [list(individual) for individual in self._optimizer.population]
+        self.population = [
+            list(individual) for individual in self._optimizer.population
+        ]
         self.generation_fitness = list(self._optimizer.fitness)
         self._sync_best()
 
@@ -138,14 +142,23 @@ class DifferentialEvolution:
         if measure != "std-fitness":
             diversity_measure = resolve_diversity_measure(measure)
             previous_population = None
-            if diversity_measure.name == "population_coherence" and diversity_measure.name in self._optimizer.diversity_history:
+            if (
+                diversity_measure.name == "population_coherence"
+                and diversity_measure.name in self._optimizer.diversity_history
+            ):
                 return self._optimizer.diversity_history[diversity_measure.name][-1]
-            return diversity_measure(self.population, [tuple(bound) for bound in self.bounds], previous_population)
+            return diversity_measure(
+                self.population,
+                [tuple(bound) for bound in self.bounds],
+                previous_population,
+            )
         if not self.generation_fitness:
             raise ValueError("No generation fitness values are available.")
         mean = sum(self.generation_fitness) / len(self.generation_fitness)
-        variance = sum((value - mean) ** 2 for value in self.generation_fitness) / len(self.generation_fitness)
-        return variance ** 0.5
+        variance = sum((value - mean) ** 2 for value in self.generation_fitness) / len(
+            self.generation_fitness
+        )
+        return variance**0.5
 
     def _sync_best(self):
         best_index = min(

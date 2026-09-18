@@ -27,7 +27,7 @@ extensions = [
     "sphinxcontrib.bibtex",
 ]
 
-templates_path = ["_templates"]
+templates_path = []
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 autosummary_generate = True

@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, cast
+from collections.abc import Iterable
 
 
 Population = list[list[float]]
@@ -27,11 +28,18 @@ class DiversityMeasure(Protocol):
 
 def _validate_population(population: Population) -> None:
     if not population:
-        raise ValueError("Population diversity measures require a non-empty population.")
+        raise ValueError(
+            "Population diversity measures require a non-empty population."
+        )
 
 
 def _euclidean_distance(left: list[float], right: list[float]) -> float:
-    return math.sqrt(sum((left_value - right_value) ** 2 for left_value, right_value in zip(left, right)))
+    return math.sqrt(
+        sum(
+            (left_value - right_value) ** 2
+            for left_value, right_value in zip(left, right, strict=True)
+        )
+    )
 
 
 def _population_center(population: Population) -> list[float]:
@@ -43,10 +51,12 @@ def _population_center(population: Population) -> list[float]:
 
 
 def _pairwise_distances(population: Population) -> list[float]:
-    distances = []
+    distances: list[float] = []
     for left_index in range(len(population)):
-        for right_index in range(left_index + 1, len(population)):
-            distances.append(_euclidean_distance(population[left_index], population[right_index]))
+        distances.extend(
+            _euclidean_distance(population[left_index], population[right_index])
+            for right_index in range(left_index + 1, len(population))
+        )
     return distances
 
 
@@ -98,7 +108,9 @@ class AverageDistanceAroundPopulationCenter:
     ) -> float:
         _validate_population(population)
         center = _population_center(population)
-        return sum(_euclidean_distance(individual, center) for individual in population) / len(population)
+        return sum(
+            _euclidean_distance(individual, center) for individual in population
+        ) / len(population)
 
 
 @dataclass(frozen=True)
@@ -117,10 +129,13 @@ class AverageDistanceAroundAllIndividuals:
         population_size = len(population)
         total = 0.0
         for center_individual in population:
-            total += sum(
-                _euclidean_distance(center_individual, other_individual)
-                for other_individual in population
-            ) / population_size
+            total += (
+                sum(
+                    _euclidean_distance(center_individual, other_individual)
+                    for other_individual in population
+                )
+                / population_size
+            )
         return total / population_size
 
 
@@ -166,7 +181,7 @@ class PopulationCoherence:
         center_step = _euclidean_distance(current_center, previous_center)
         average_individual_step = sum(
             _euclidean_distance(current, previous)
-            for current, previous in zip(population, previous_population)
+            for current, previous in zip(population, previous_population, strict=True)
         ) / len(population)
         if average_individual_step == 0.0:
             return 0.0
@@ -188,10 +203,17 @@ class DimensionalVariance:
         _validate_population(population)
         center = _population_center(population)
         dimension = len(center)
-        return sum(
-            sum((individual[coordinate] - center[coordinate]) ** 2 for individual in population) / len(population)
-            for coordinate in range(dimension)
-        ) / dimension
+        return (
+            sum(
+                sum(
+                    (individual[coordinate] - center[coordinate]) ** 2
+                    for individual in population
+                )
+                / len(population)
+                for coordinate in range(dimension)
+            )
+            / dimension
+        )
 
 
 @dataclass(frozen=True)
@@ -230,7 +252,9 @@ class AggregatedDistribution:
                 counts[bin_index] += 1
             mean_count = sum(counts) / bin_count
             variance = sum((count - mean_count) ** 2 for count in counts) / bin_count
-            dimensional_indices.append(0.0 if mean_count == 0.0 else variance / mean_count)
+            dimensional_indices.append(
+                0.0 if mean_count == 0.0 else variance / mean_count
+            )
         return sum(dimensional_indices) / len(dimensional_indices)
 
 
@@ -252,28 +276,41 @@ _DIVERSITY_MEASURES = {
 }
 
 
-def resolve_diversity_measure(specification: str | DiversityMeasure) -> DiversityMeasure:
+def resolve_diversity_measure(
+    specification: str | DiversityMeasure,
+) -> DiversityMeasure:
     """Normalize a user diversity-measure specification."""
 
-    if hasattr(specification, "__call__") and hasattr(specification, "name"):
-        return specification
+    if callable(specification) and hasattr(specification, "name"):
+        return cast(DiversityMeasure, specification)
     if not isinstance(specification, str):
-        raise TypeError("Diversity measures must be named strings or callables with a name attribute.")
+        raise TypeError(
+            "Diversity measures must be named strings or callables with a name attribute."
+        )
     try:
-        return _DIVERSITY_MEASURES[specification]()
+        return cast(DiversityMeasure, _DIVERSITY_MEASURES[specification]())
     except KeyError as error:
         raise ValueError(f"Unknown diversity measure: {specification!r}") from error
 
 
 def resolve_diversity_measures(
-    specifications: None | str | DiversityMeasure | list[str | DiversityMeasure] | tuple[str | DiversityMeasure, ...]
+    specifications: str | DiversityMeasure | Iterable[str | DiversityMeasure] | None,
 ) -> list[DiversityMeasure]:
     """Resolve zero, one, or many diversity-measure specifications."""
 
     if specifications is None:
         return []
-    if specifications == "none":
+    if isinstance(specifications, str) and specifications == "none":
         return []
     if isinstance(specifications, (str,)) or hasattr(specifications, "name"):
-        return [resolve_diversity_measure(specifications)]
-    return [resolve_diversity_measure(specification) for specification in specifications]
+        return [
+            resolve_diversity_measure(cast("str | DiversityMeasure", specifications))
+        ]
+    measures = [
+        resolve_diversity_measure(specification)
+        for specification in cast(Iterable[str | DiversityMeasure], specifications)
+    ]
+    names = [measure.name for measure in measures]
+    if len(names) != len(set(names)):
+        raise ValueError("Diversity measure names must be unique (including aliases).")
+    return measures

@@ -2,9 +2,25 @@
 
 from __future__ import annotations
 
+from .protocols import RandomSource
+
 import math
-from dataclasses import fields
-from dataclasses import dataclass
+from typing import Any, Protocol, TYPE_CHECKING
+from dataclasses import Field, fields
+from dataclasses import dataclass, field
+
+
+if TYPE_CHECKING:
+    from .scales import ScaleFactorController
+
+
+_FIELD_CACHE: dict[type, tuple[Field[Any], ...]] = {}
+
+
+def _component_fields(cls: type) -> tuple[Field[Any], ...]:
+    if cls not in _FIELD_CACHE:
+        _FIELD_CACHE[cls] = fields(cls)
+    return _FIELD_CACHE[cls]
 
 
 Population = list[list[float]]
@@ -13,7 +29,7 @@ Population = list[list[float]]
 def sample_distinct_indices(
     population_size: int,
     count: int,
-    rng: object,
+    rng: RandomSource,
     excluded: tuple[int, ...] = (),
 ) -> list[int]:
     """Sample distinct population indices while excluding reserved indices.
@@ -40,7 +56,8 @@ def sample_distinct_indices(
         If too few eligible indices remain.
     """
 
-    available = [index for index in range(population_size) if index not in set(excluded)]
+    excluded_set = set(excluded)
+    available = [index for index in range(population_size) if index not in excluded_set]
     if count > len(available):
         raise ValueError(
             "Population too small for the requested mutation strategy and exclusions."
@@ -64,7 +81,13 @@ class MutationContext:
     best_index: int
     best_vector: list[float]
     bounds: list[tuple[float, float]]
-    rng: object
+    rng: RandomSource
+
+
+class MutationOperator(Protocol):
+    """Create a donor from a read-only generation snapshot."""
+
+    def __call__(self, context: MutationContext) -> list[float]: ...
 
 
 class BaseMutation:
@@ -74,7 +97,7 @@ class BaseMutation:
         if not context.population:
             raise ValueError("Population must be initialized before mutation.")
 
-    def initialize(self, population_size: int, rng: object) -> None:
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
         for controller in self._scale_controllers():
             controller.initialize(population_size, rng)
 
@@ -87,20 +110,26 @@ class BaseMutation:
             if hasattr(controller, "resize"):
                 controller.resize(kept_indices)
 
-    def _resolve_scale(self, value: float | object, context: MutationContext) -> float:
+    def _resolve_scale(
+        self, value: float | ScaleFactorController, context: MutationContext
+    ) -> float:
         if hasattr(value, "propose"):
             return float(value.propose(context))
         return float(value)
 
-    def _scale_controllers(self) -> list[object]:
+    def _scale_controllers(self) -> list[ScaleFactorController]:
         seen: set[int] = set()
         controllers = []
-        for field_definition in fields(self):
+        for field_definition in _component_fields(type(self)):
             value = getattr(self, field_definition.name)
-            if hasattr(value, "initialize") and hasattr(value, "propose") and hasattr(value, "commit"):
-                if id(value) not in seen:
-                    seen.add(id(value))
-                    controllers.append(value)
+            if (
+                hasattr(value, "initialize")
+                and hasattr(value, "propose")
+                and hasattr(value, "commit")
+                and id(value) not in seen
+            ):
+                seen.add(id(value))
+                controllers.append(value)
         return controllers
 
 
@@ -108,7 +137,9 @@ class BaseMutation:
 class Rand1(BaseMutation):
     """DE/rand/1 donor mutation."""
 
-    scale: float | object
+    scale: float | ScaleFactorController
+
+    required_population_size = 4
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
@@ -131,7 +162,9 @@ class Rand1(BaseMutation):
 class Rand2(BaseMutation):
     """DE/rand/2 donor mutation."""
 
-    scale: float | object
+    scale: float | ScaleFactorController
+
+    required_population_size = 6
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
@@ -156,7 +189,9 @@ class Rand2(BaseMutation):
 class Best1(BaseMutation):
     """DE/best/1 donor mutation."""
 
-    scale: float | object
+    scale: float | ScaleFactorController
+
+    required_population_size = 3
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
@@ -165,7 +200,7 @@ class Best1(BaseMutation):
             len(context.population),
             2,
             context.rng,
-            excluded=(context.target_index, context.best_index),
+            excluded=(context.target_index,),
         )
         return [
             context.best_vector[dimension]
@@ -179,7 +214,9 @@ class Best1(BaseMutation):
 class Best2(BaseMutation):
     """DE/best/2 donor mutation."""
 
-    scale: float | object
+    scale: float | ScaleFactorController
+
+    required_population_size = 5
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
@@ -188,7 +225,7 @@ class Best2(BaseMutation):
             len(context.population),
             4,
             context.rng,
-            excluded=(context.target_index, context.best_index),
+            excluded=(context.target_index,),
         )
         return [
             context.best_vector[dimension]
@@ -204,19 +241,24 @@ class Best2(BaseMutation):
 class CurrentToBest1(BaseMutation):
     """DE/current-to-best/1 with an optional separate difference scale."""
 
-    scale: float | object
-    difference_scale: float | object | None = None
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 3
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
         scale = self._resolve_scale(self.scale, context)
-        difference_scale_value = self.scale if self.difference_scale is None else self.difference_scale
-        difference_scale = self._resolve_scale(difference_scale_value, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
         r1, r2 = sample_distinct_indices(
             len(context.population),
             2,
             context.rng,
-            excluded=(context.target_index, context.best_index),
+            excluded=(context.target_index,),
         )
         target_vector = context.population[context.target_index]
         return [
@@ -232,19 +274,24 @@ class CurrentToBest1(BaseMutation):
 class CurrentToBest2(BaseMutation):
     """DE/current-to-best/2 with an optional separate difference scale."""
 
-    scale: float | object
-    difference_scale: float | object | None = None
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 5
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
         scale = self._resolve_scale(self.scale, context)
-        difference_scale_value = self.scale if self.difference_scale is None else self.difference_scale
-        difference_scale = self._resolve_scale(difference_scale_value, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
         r1, r2, r3, r4 = sample_distinct_indices(
             len(context.population),
             4,
             context.rng,
-            excluded=(context.target_index, context.best_index),
+            excluded=(context.target_index,),
         )
         target_vector = context.population[context.target_index]
         return [
@@ -262,14 +309,19 @@ class CurrentToBest2(BaseMutation):
 class CurrentToRand1(BaseMutation):
     """DE/current-to-rand/1 donor mutation."""
 
-    scale: float | object
-    difference_scale: float | object | None = None
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 4
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
         scale = self._resolve_scale(self.scale, context)
-        difference_scale_value = self.scale if self.difference_scale is None else self.difference_scale
-        difference_scale = self._resolve_scale(difference_scale_value, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
         r1, r2, r3 = sample_distinct_indices(
             len(context.population),
             3,
@@ -290,14 +342,19 @@ class CurrentToRand1(BaseMutation):
 class CurrentToRand2(BaseMutation):
     """DE/current-to-rand/2 donor mutation."""
 
-    scale: float | object
-    difference_scale: float | object | None = None
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 6
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
         scale = self._resolve_scale(self.scale, context)
-        difference_scale_value = self.scale if self.difference_scale is None else self.difference_scale
-        difference_scale = self._resolve_scale(difference_scale_value, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
         r1, r2, r3, r4, r5 = sample_distinct_indices(
             len(context.population),
             5,
@@ -323,10 +380,13 @@ class TrigonometricMutation(BaseMutation):
     With probability ``probability`` this applies the trigonometric
     mutation operator from Fan and Lampinen (2003). Otherwise it applies
     the usual ``DE/rand/1`` donor formula using the same sampled indices.
+    Absolute-fitness weights make this published operator sensitive to objective offsets.
     """
 
     probability: float
-    scale: float | object
+    scale: float | ScaleFactorController
+
+    required_population_size = 4
 
     def __post_init__(self) -> None:
         if not 0.0 <= self.probability <= 1.0:
@@ -384,7 +444,9 @@ class TrigonometricMutation(BaseMutation):
         vector_3 = context.population[r3]
         mean_vector = [
             (value_1 + value_2 + value_3) / 3.0
-            for value_1, value_2, value_3 in zip(vector_1, vector_2, vector_3)
+            for value_1, value_2, value_3 in zip(
+                vector_1, vector_2, vector_3, strict=True
+            )
         ]
         p1, p2, p3 = weights
         return [
@@ -393,26 +455,30 @@ class TrigonometricMutation(BaseMutation):
             + (p3 - p2) * (value_2 - value_3)
             + (p1 - p3) * (value_3 - value_1)
             for mean_value, value_1, value_2, value_3 in zip(
-                mean_vector,
-                vector_1,
-                vector_2,
-                vector_3,
+                mean_vector, vector_1, vector_2, vector_3, strict=True
             )
         ]
 
 
 @dataclass(frozen=True)
 class DirectedMutation(BaseMutation):
-    """Fan-Lampinen directed mutation with DE/rand/1 fallback.
+    """Project-specific normalized directed mutation with DE/rand/1 fallback.
 
     The sampled triple is ordered by objective value. The best sampled vector
     becomes the base vector and the two worse vectors define the directed
-    extrapolation terms. If the canonical coefficients are undefined because
-    the worse objective values are non-positive or non-finite, the operator
-    falls back to ``DE/rand/1`` using the original sampled order.
+    extrapolation terms, weighted by normalized fitness gaps in [0, 1].
+    Constant or non-finite fitness falls back to DE/rand/1. This is a project
+    variant; correspondence with Fan-Lampinen directed mutation is unverified.
     """
 
-    fallback_scale: float | object = 1.0
+    fallback_scale: float | ScaleFactorController = 1.0
+    fallback_count: int = field(default=0, init=False, compare=False)
+
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
+        object.__setattr__(self, "fallback_count", 0)
+        super().initialize(population_size, rng)
+
+    required_population_size = 4
 
     def __call__(self, context: MutationContext) -> list[float]:
         self._require_dimension(context)
@@ -430,7 +496,7 @@ class DirectedMutation(BaseMutation):
         worse_fitness_2 = context.fitness[worse_index_2]
 
         if not all(
-            math.isfinite(value) and value > 0.0
+            math.isfinite(value)
             for value in (best_fitness, worse_fitness_1, worse_fitness_2)
         ):
             return self._rand1_fallback(context, sampled)
@@ -439,17 +505,22 @@ class DirectedMutation(BaseMutation):
         worse_vector_1 = context.population[worse_index_1]
         worse_vector_2 = context.population[worse_index_2]
 
-        coefficient_1 = (1.0 - best_fitness) / worse_fitness_1
-        coefficient_2 = (1.0 - best_fitness) / worse_fitness_2
+        magnitude = max(
+            abs(best_fitness), abs(worse_fitness_1), abs(worse_fitness_2), 1e-300
+        )
+        best = best_fitness / magnitude
+        span = worse_fitness_2 / magnitude - best
+        if span == 0.0:
+            return self._rand1_fallback(context, sampled)
+        coefficient_1 = (worse_fitness_1 / magnitude - best) / span
+        coefficient_2 = 1.0
 
         return [
             best_value
             + coefficient_1 * (best_value - worse_value_1)
             + coefficient_2 * (best_value - worse_value_2)
             for best_value, worse_value_1, worse_value_2 in zip(
-                best_vector,
-                worse_vector_1,
-                worse_vector_2,
+                best_vector, worse_vector_1, worse_vector_2, strict=True
             )
         ]
 
@@ -458,6 +529,7 @@ class DirectedMutation(BaseMutation):
         context: MutationContext,
         sampled: list[int],
     ) -> list[float]:
+        object.__setattr__(self, "fallback_count", self.fallback_count + 1)
         r1, r2, r3 = sampled
         scale = self._resolve_scale(self.fallback_scale, context)
         return [
@@ -484,6 +556,8 @@ class NeighborhoodSearchMutation(BaseMutation):
     gaussian_stddev: float = 0.5
     cauchy_scale: float = 1.0
 
+    required_population_size = 4
+
     def __post_init__(self) -> None:
         if not 0.0 <= self.gaussian_probability <= 1.0:
             raise ValueError("gaussian_probability must be between 0 and 1.")
@@ -508,12 +582,12 @@ class NeighborhoodSearchMutation(BaseMutation):
             for dimension in range(len(context.population[context.target_index]))
         ]
 
-    def _sample_factor(self, rng: object) -> float:
+    def _sample_factor(self, rng: RandomSource) -> float:
         if rng.random() < self.gaussian_probability:
             return rng.gauss(self.gaussian_mean, self.gaussian_stddev)
         return self._sample_cauchy(rng)
 
-    def _sample_cauchy(self, rng: object) -> float:
+    def _sample_cauchy(self, rng: RandomSource) -> float:
         uniform = rng.random()
         while uniform <= 0.0 or uniform >= 1.0:
             uniform = rng.random()

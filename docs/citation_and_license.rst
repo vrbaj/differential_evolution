@@ -4,9 +4,8 @@ Citation and license
 License
 -------
 
-The project metadata currently declares the MIT license. A dedicated
-``LICENSE`` file is not present in the repository and should be added if the
-project is to be distributed formally.
+The project is distributed under the MIT license. The repository and built
+distributions include the full license text in ``LICENSE``.
 
 Software citation
 -----------------

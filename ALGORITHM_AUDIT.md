@@ -1,3 +1,8 @@
+> Historical refactor audit. The current behavior supersedes the formulas and
+> exclusion rules below where noted in [review fixes](docs/review_fixes.md).
+> In particular, the old DirectedMutation attribution/formula is withdrawn;
+> Best-family exclusions, initialization, and SHADE/L-SHADE rules changed.
+
 # Algorithm Audit
 
 ## Scope
@@ -367,7 +372,7 @@ Notation below follows the standard DE literature:
 
 ### Original implementation status
 
-- File: the former `sobol_initialization` in [population_initialization.py](/home/honza/PycharmProjects/differential_evolution/population_initialization.py)
+- File: the former `sobol_initialization` in [population_initialization.py](population_initialization.py)
 - Result: incorrect
 - Reasons:
   - It did not implement the standard direction-number recurrence.
@@ -376,7 +381,7 @@ Notation below follows the standard DE literature:
 
 ### Replacement implementation
 
-- New component: `SobolInitializer` in [initializers.py](/home/honza/PycharmProjects/differential_evolution/differential_evolution/initializers.py)
+- New component: `SobolInitializer` in [initializers.py](differential_evolution/initializers.py)
 - Construction:
   - Uses the Bratley-Fox recurrence with primitive polynomials and initial direction numbers.
   - Generates the first `n` points including the zero vector.

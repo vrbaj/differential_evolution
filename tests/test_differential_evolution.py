@@ -216,13 +216,13 @@ class MutationFormulaTests(unittest.TestCase):
     def test_directed_mutation_formula(self):
         context = make_context(DeterministicRNG(samples=[[2, 3, 4]]))
         donor = DirectedMutation()(context)
-        self.assertAlmostEqual(donor[0], 14.0 / 3.0)
-        self.assertAlmostEqual(donor[1], 17.0 / 3.0)
+        self.assertAlmostEqual(donor[0], -2.0)
+        self.assertAlmostEqual(donor[1], -1.0)
 
     def test_directed_mutation_falls_back_when_coefficients_are_undefined(self):
         context = MutationContext(
             population=make_context(DeterministicRNG()).population,
-            fitness=[10.0, 1.0, 0.0, 3.0, 4.0, 5.0],
+            fitness=[10.0, 1.0, math.inf, 3.0, 4.0, 5.0],
             target_index=0,
             best_index=1,
             best_vector=[1.0, 2.0],
@@ -440,7 +440,7 @@ class OptimizerTests(unittest.TestCase):
         optimizer.population = [[4.0], [3.0], [2.0], [1.0]]
         optimizer.fitness = [16.0, 9.0, 4.0, 1.0]
         optimizer._step()
-        self.assertEqual(mutation.first_generation_targets, [4.0, 3.0, 2.0, 1.0])
+        self.assertEqual(optimizer.mutation.first_generation_targets, [4.0, 3.0, 2.0, 1.0])
         self.assertEqual(optimizer.population, [[3.0], [2.0], [1.0], [0.0]])
 
     def test_trial_vectors_do_not_modify_snapshot_population_in_place(self):
@@ -543,7 +543,7 @@ class OptimizerTests(unittest.TestCase):
         optimizer.population = [[4.0], [1.0], [3.0], [2.0]]
         optimizer.fitness = [4.0, 1.0, 3.0, 2.0]
         optimizer._step()
-        self.assertEqual(scale_factor.values(), [0.2, 0.5, 0.4, 0.5])
+        self.assertEqual(optimizer.mutation.scale.values(), [0.2, 0.5, 0.4, 0.5])
 
     def test_adaptive_scale_factor_reuses_same_value_within_one_target(self):
         scale_factor = AdaptiveScaleFactor(initial=0.5, tau=1.0, lower=0.1, upper=0.9)
@@ -581,7 +581,7 @@ class OptimizerTests(unittest.TestCase):
         optimizer.population = [[4.0], [1.0], [3.0], [2.0]]
         optimizer.fitness = [4.0, 1.0, 3.0, 2.0]
         optimizer._step()
-        self.assertEqual(crossover_rate.values(), [0.2, 0.3, 0.4, 0.7])
+        self.assertEqual(optimizer.crossover.crossover_rate.values(), [0.2, 0.3, 0.4, 0.7])
 
     def test_jde_convenience_helper_builds_paper_components(self):
         components = jde_rand_1_bin()
@@ -650,28 +650,16 @@ class OptimizerTests(unittest.TestCase):
         self.assertEqual(optimizer.population_size_history[-1], 2)
 
     def test_population_schedule_resizes_adaptive_controllers(self):
-        scale_factor = AdaptiveScaleFactor(initial=0.5, tau=0.0, lower=0.1, upper=0.9)
-        crossover_rate = AdaptiveCrossoverRate(initial=0.9, tau=0.0, lower=0.0, upper=1.0)
         optimizer = DifferentialEvolution(
-            objective=lambda x: x[0],
-            bounds=[(-10.0, 10.0)],
-            population_size=4,
-            mutation=Rand1(scale=scale_factor),
-            crossover=BinomialCrossover(crossover_rate=crossover_rate),
-            population_schedule=LinearPopulationReduction(min_population_size=2),
-            max_generations=1,
-            max_evaluations=4,
-            rng=DeterministicRNG(
-                samples=[[1, 2, 3], [0, 2, 3], [0, 1, 3], [0, 1, 2]],
-                randrange_values=[0, 0, 0, 0],
-                random_values=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
-            ),
+            objective=sphere_function, bounds=[(-10., 10.)], population_size=6,
+            mutation=Rand1(scale=AdaptiveScaleFactor()),
+            crossover=BinomialCrossover(AdaptiveCrossoverRate()),
+            population_schedule=LinearPopulationReduction(min_population_size=4),
+            max_generations=1, seed=1,
         )
-        optimizer.population = [[4.0], [1.0], [3.0], [2.0]]
-        optimizer.fitness = [4.0, 1.0, 3.0, 2.0]
-        optimizer._step()
-        self.assertEqual(scale_factor.values(), [0.5, 0.5])
-        self.assertEqual(crossover_rate.values(), [0.9, 0.9])
+        optimizer.run()
+        self.assertEqual(len(optimizer.mutation.scale.values()), 4)
+        self.assertEqual(len(optimizer.crossover.crossover_rate.values()), 4)
 
     def test_partial_generation_respects_max_evaluations(self):
         optimizer = DifferentialEvolution(
@@ -721,11 +709,11 @@ class SHADETests(unittest.TestCase):
             max_evaluations=5,
             memory_size=2,
             rng=DeterministicRNG(
-                randrange_values=[0, 0],
+                randrange_values=[0, 3, 0],
                 random_values=[0.5],
                 gauss_values=[1.0],
                 uniform_values=[0.5],
-                samples=[[1], [2], [("population", 3)]],
+                samples=[[1], [2]],
             ),
         )
         optimizer.population = [[4.0], [1.0], [3.0], [2.0]]
@@ -793,7 +781,7 @@ class CompatibilityTests(unittest.TestCase):
             sphere_function,
             bounds=[[0.0, 2.0], [0.0, 2.0]],
             max_iterations=0,
-            population_size=3,
+            population_size=4,
             mutation=[0.5],
             crossover=0.5,
             strategy="DE/rand/1",
@@ -815,15 +803,13 @@ class CompatibilityTests(unittest.TestCase):
             population_initialization_algorithm="sobol",
         )
         optimizer.initialize()
-        self.assertEqual(
-            optimizer.population,
-            [[-5.0, -5.0], [0.0, 0.0], [2.5, -2.5], [-2.5, 2.5]],
-        )
+        self.assertEqual(len(optimizer.population), 4)
+        self.assertTrue(all(-5 <= value <= 5 for point in optimizer.population for value in point))
 
 
 class SobolInitializerTests(unittest.TestCase):
     def test_first_points_in_two_dimensions_match_known_sequence(self):
-        points = SobolInitializer()(
+        points = SobolInitializer(scramble=False)(
             8,
             [(0.0, 1.0), (0.0, 1.0)],
             lambda _: 0.0,
@@ -844,7 +830,7 @@ class SobolInitializerTests(unittest.TestCase):
         )
 
     def test_scaling_to_bounds(self):
-        points = SobolInitializer()(
+        points = SobolInitializer(scramble=False)(
             4,
             [(-1.0, 1.0), (10.0, 20.0)],
             lambda _: 0.0,

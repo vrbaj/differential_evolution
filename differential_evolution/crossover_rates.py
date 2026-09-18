@@ -2,7 +2,19 @@
 
 from __future__ import annotations
 
+from .protocols import RandomSource
+
 from dataclasses import dataclass, field
+from typing import Protocol
+
+
+class CrossoverRateController(Protocol):
+    """Propose one rate per target and retain it only after accepted selection."""
+
+    def initialize(self, population_size: int, rng: RandomSource) -> None: ...
+    def propose(self, target_index: int, rng: RandomSource) -> float: ...
+    def commit(self, target_index: int, accepted: bool) -> None: ...
+    def resize(self, kept_indices: list[int]) -> None: ...
 
 
 @dataclass(frozen=True)
@@ -15,10 +27,10 @@ class ConstantCrossoverRate:
         if not 0.0 <= self.value <= 1.0:
             raise ValueError("ConstantCrossoverRate requires 0 <= value <= 1.")
 
-    def initialize(self, population_size: int, rng: object) -> None:
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
         return None
 
-    def propose(self, target_index: int, rng: object) -> float:
+    def propose(self, target_index: int, rng: RandomSource) -> float:
         return self.value
 
     def commit(self, target_index: int, accepted: bool) -> None:
@@ -53,13 +65,15 @@ class AdaptiveCrossoverRate:
         if not 0.0 <= self.tau <= 1.0:
             raise ValueError("tau must be between 0 and 1.")
 
-    def initialize(self, population_size: int, rng: object) -> None:
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
         self._values = [self.initial for _ in range(population_size)]
         self._pending.clear()
 
-    def propose(self, target_index: int, rng: object) -> float:
+    def propose(self, target_index: int, rng: RandomSource) -> float:
         if target_index in self._pending:
             return self._pending[target_index]
+        if not self._values:
+            self.initialize(target_index + 1, rng)
         value = self._values[target_index]
         if rng.random() < self.tau:
             value = rng.uniform(self.lower, self.upper)

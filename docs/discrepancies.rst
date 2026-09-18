@@ -25,15 +25,13 @@ Potentially nonstandard or worth manual review
 
 ``OppositionInitializer`` and ``QuasiOppositionInitializer``
    These initializers evaluate a doubled candidate pool during initialization
-   and the optimizer then evaluates the retained population again. This is
-   current behavior, not a documentation mistake, but users should be aware
-   that initialization consumes extra objective evaluations.
+   and reuse the retained fitness. Their cost is twice the population size,
+   compared with one population for uniform, Tent, and Sobol initialization.
 
 ``DirectedMutation``
-   The implementation follows the formula documented in this repository, but
-   the directed-mutation family is less standardized in the DE literature than
-   the classical ``rand`` and ``best`` families. If a future paper source is
-   preferred, the exact naming and equation should be checked again.
+   A project-specific variant using normalized fitness gaps. The previous raw
+   fitness coefficient could diverge near zero. Its unverified attribution to
+   Fan-Lampinen has been removed; the trigonometric paper is not its source.
 
 ``NeighborhoodSearchMutation``
    The implementation is a clear Gaussian/Cauchy differential mutation, but a
@@ -52,3 +50,18 @@ Potentially nonstandard or worth manual review
    archive usage, and linear population reduction structure from the Tanabe and
    Fukunaga papers. Experimental parameter defaults in published benchmarks may
    still vary, so production research runs should set them explicitly.
+
+Review corrections
+------------------
+
+SHADE uses an arithmetic CR memory and no terminal CR state. L-SHADE uses
+Lehmer means for both memories, terminal CR slots, and fixed p=0.11. Both
+allow the target in the p-best set, exclude only target and r1 from r2's
+population candidates, accept ties, and cap the archive on insertion.
+Only strictly improving finite differences contribute to adaptation.
+Both default to parent-aware midpoint repair. Explicit handlers override it.
+
+L-SHADE without an evaluation budget retains a generation-based schedule for
+compatibility and emits a warning. Pass max_evaluations for evaluation-based
+linear population reduction. Trigonometric mutation intentionally depends on
+absolute fitness values and therefore on objective offsets.

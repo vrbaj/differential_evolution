@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -9,9 +9,16 @@ description = "Composable Differential Evolution optimizer"
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [{ name = "Honza" }]
-license = { text = "MIT" }
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["optimization", "differential-evolution", "global-optimization"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
 
 [project.optional-dependencies]
+test = ["pytest>=7", "mypy>=1.10", "ruff>=0.6"]
 docs = [
     "Sphinx>=8,<9",
     "sphinxcontrib-bibtex>=2.6,<3",
@@ -20,3 +27,22 @@ docs = [
 
 [tool.setuptools.packages.find]
 include = ["differential_evolution*"]
+
+[project.urls]
+Repository = "https://github.com/vrbaj/differential_evolution"
+Issues = "https://github.com/vrbaj/differential_evolution/issues"
+
+[tool.setuptools]
+py-modules = ["main", "population_initialization", "testing_functions"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+differential_evolution = ["py.typed"]
+
+[tool.ruff.lint]
+select = ["F", "B", "RUF", "SIM", "PERF"]
+
+[tool.mypy]
+files = ["differential_evolution"]

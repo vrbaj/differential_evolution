@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import pickle
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -33,7 +34,18 @@ def snapshots_to_dicts(snapshots: list[GenerationSnapshot]) -> list[dict[str, An
 def save_json(data: Any, path: str | Path) -> None:
     """Save JSON-serializable data."""
 
-    Path(path).write_text(json.dumps(data, indent=2), encoding="utf-8")
+    def normalize(value):
+        if isinstance(value, float) and not math.isfinite(value):
+            return str(value)
+        if isinstance(value, dict):
+            return {key: normalize(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [normalize(item) for item in value]
+        return value
+
+    Path(path).write_text(
+        json.dumps(normalize(data), indent=2, allow_nan=False), encoding="utf-8"
+    )
 
 
 def save_pickle(data: Any, path: str | Path) -> None:

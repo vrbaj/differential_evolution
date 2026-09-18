@@ -23,7 +23,8 @@ class PopulationScheduleState:
 class PopulationSchedule(Protocol):
     """Return the desired population size after a generation."""
 
-    min_population_size: int
+    @property
+    def min_population_size(self) -> int: ...
 
     def target_size(self, state: PopulationScheduleState) -> int:
         """Return the desired next population size."""
@@ -72,7 +73,7 @@ class HyperbolicTangentPopulationReduction:
 
     min_population_size: int
     start: float = -3.0
-    end: float = 6.0
+    end: float = 0.0
 
     def __post_init__(self) -> None:
         if self.min_population_size < 1:

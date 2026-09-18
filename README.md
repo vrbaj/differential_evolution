@@ -145,7 +145,7 @@ print(result.diversity_history["population_diameter"])
 - `QuasiOppositionInitializer`
 - `SobolInitializer`
 
-The original Sobol implementation was wrong and has been replaced with a correct low-discrepancy initializer for dimensions up to 40. Details are in [ALGORITHM_AUDIT.md](/home/honza/PycharmProjects/differential_evolution/ALGORITHM_AUDIT.md).
+The original Sobol implementation was wrong and has been replaced with a correct low-discrepancy initializer for dimensions up to 40. Details are in [ALGORITHM_AUDIT.md](ALGORITHM_AUDIT.md).
 
 ## Population reduction
 
@@ -290,11 +290,24 @@ The original constructor remains available:
 from main import DifferentialEvolution
 ```
 
-That path now emits a deprecation warning and forwards into the new implementation. Details are in [MIGRATION.md](/home/honza/PycharmProjects/differential_evolution/MIGRATION.md).
+That path now emits a deprecation warning and forwards into the new implementation. Details are in [MIGRATION.md](MIGRATION.md).
 
 ## Verification
 
-- algorithm audit: [ALGORITHM_AUDIT.md](/home/honza/PycharmProjects/differential_evolution/ALGORITHM_AUDIT.md)
-- migration notes: [MIGRATION.md](/home/honza/PycharmProjects/differential_evolution/MIGRATION.md)
+- algorithm audit: [ALGORITHM_AUDIT.md](ALGORITHM_AUDIT.md)
+- migration notes: [MIGRATION.md](MIGRATION.md)
 - tests: `python3 -m unittest discover -s tests -v`
 - examples: `python3 -m examples.basic_usage` and `python3 -m examples.custom_components`
+
+### Review corrections and compatibility
+
+See [review fixes](docs/review_fixes.md) for changes and the disposition of the
+reported findings. Plain DE now clips to bounds by default; SHADE/L-SHADE use
+parent-aware midpoint repair. Mutation and crossover components are copied per
+optimizer; inspect adapted state on `optimizer.mutation` and `optimizer.crossover`.
+`run()` is single-use. `result.success` means a usable objective value was found,
+not numerical convergence; `result.message` reports the exhausted limit.
+
+Sobol initialization uses a seeded digital shift by default. Use
+`SobolInitializer(scramble=False)` for the original unshifted sequence. All
+fixed-dimensional benchmarks, including Ackley, require exactly two coordinates.

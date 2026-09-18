@@ -90,9 +90,8 @@ Classical DE family
       + F \left(\mathbf{x}_{r_1,g} - \mathbf{x}_{r_2,g}\right).
 
    Implementation detail:
-   the sampled indices exclude both ``target_index`` and ``best_index``.
-   Minimum valid population size: 3 when the target already is the current
-   best vector, otherwise 4.
+   the sampled indices exclude only ``target_index``.
+   Minimum valid population size: 3.
 
 ``Best2`` (DE/best/2)
    .. math::
@@ -101,8 +100,7 @@ Classical DE family
       + F \left(\mathbf{x}_{r_1,g} - \mathbf{x}_{r_2,g}\right)
       + F \left(\mathbf{x}_{r_3,g} - \mathbf{x}_{r_4,g}\right).
 
-   Minimum valid population size: 5 when the target already is the current
-   best vector, otherwise 6.
+   Minimum valid population size: 5.
 
 ``CurrentToBest1`` (DE/current-to-best/1)
    .. math::
@@ -113,9 +111,8 @@ Classical DE family
 
    When ``difference_scale=None``, the implementation uses
    :math:`F_d = F_b`, which recovers the conventional single-:math:`F` form.
-   The sampled difference indices exclude both ``target_index`` and
-   ``best_index``. Minimum valid population size: 3 when the target already is
-   the current best vector, otherwise 4.
+   The sampled difference indices exclude only ``target_index``.
+   Minimum valid population size: 3.
 
 ``CurrentToBest2`` (DE/current-to-best/2)
    .. math::
@@ -125,8 +122,7 @@ Classical DE family
       + F_d \left(\mathbf{x}_{r_1,g} - \mathbf{x}_{r_2,g}\right)
       + F_d \left(\mathbf{x}_{r_3,g} - \mathbf{x}_{r_4,g}\right).
 
-   Minimum valid population size: 5 when the target already is the current
-   best vector, otherwise 6.
+   Minimum valid population size: 5.
 
 ``CurrentToRand1`` (DE/current-to-rand/1)
    .. math::
@@ -179,19 +175,12 @@ Extended strategies
    to ``DE/rand/1``. Minimum valid population size: 4.
 
 ``DirectedMutation``
-   Orders three sampled vectors by objective value and extrapolates from the
-   best sampled vector:
-
-   .. math::
-
-      \mathbf{v}_{i,g} = \mathbf{x}_{b,g}
-      + \frac{1-f_b}{f_{w_1}}(\mathbf{x}_{b,g}-\mathbf{x}_{w_1,g})
-      + \frac{1-f_b}{f_{w_2}}(\mathbf{x}_{b,g}-\mathbf{x}_{w_2,g}).
-
-   If any of the three selected objective values is non-positive or
-   non-finite, the implementation falls back to ``DE/rand/1`` with the
-   original sampled order. The exact paper mapping should be treated as
-   requiring manual review; the formula above matches the implementation.
+   A project-specific normalized directed mutation. Three sampled vectors are
+   ordered by fitness; the best is the base. Each worse vector contributes
+   ``(f_w - f_best) / (f_worst - f_best) * (x_best - x_w)``.
+   Coefficients lie in [0, 1] and are invariant to positive scaling and shifting
+   of finite fitness. Constant or non-finite fitness triggers DE/rand/1 fallback.
+   This is not claimed to reproduce Fan-Lampinen directed mutation.
 
 ``NeighborhoodSearchMutation``
    Implements the repository's NSDE-style Gaussian/Cauchy mutation:
@@ -294,8 +283,8 @@ Initialization
 
    Implementation detail:
    this initializer ranks candidates by calling the supplied objective during
-   initialization, so it consumes additional evaluations before the optimizer
-   evaluates the retained population again.
+   initialization. Retained fitness is reused, for a total cost of twice the
+   requested population size; the evaluation budget includes this cost.
 
 ``QuasiOppositionInitializer``
    Uses quasi-opposite points relative to the coordinate-wise midpoint
@@ -306,7 +295,8 @@ Initialization
 
 ``SobolInitializer``
    Generates a Sobol low-discrepancy sequence using a Bratley-Fox style
-   direction-number recurrence for up to 40 dimensions
+   direction-number recurrence for up to 40 dimensions, with a seeded random
+   digital shift by default (``scramble=False`` gives the unshifted sequence)
    :cite:`sobol_1967,bratley_fox_1988`.
 
 Boundary handling
@@ -420,6 +410,12 @@ SHADE and L-SHADE
    Extends SHADE with linear population size reduction
    :cite:`tanabe_fukunaga_2014`. If no explicit ``population_schedule`` is
    supplied, the class installs ``LinearPopulationReduction`` automatically.
+   Unlike SHADE, it uses fixed p=0.11 and weighted Lehmer means for both
+   F and CR. A CR slot becomes terminal when all successful CR values are
+   zero. Both solvers use midpoint repair by default, allow tied trials to
+   survive, and adapt only from strictly positive finite improvements.
+   Supply max_evaluations for evaluation-based reduction; omission emits a
+   warning and retains the generation-based compatibility variant.
 
 Population schedules
 --------------------

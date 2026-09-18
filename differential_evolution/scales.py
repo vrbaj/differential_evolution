@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from .protocols import RandomSource
+
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -11,7 +13,7 @@ from .mutation import MutationContext
 class ScaleFactorController(Protocol):
     """Produce scale factors and optionally adapt them across generations."""
 
-    def initialize(self, population_size: int, rng: object) -> None:
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
         """Prepare any per-population state."""
 
     def propose(self, context: MutationContext) -> float:
@@ -30,7 +32,7 @@ class ConstantScaleFactor:
 
     value: float
 
-    def initialize(self, population_size: int, rng: object) -> None:
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
         return None
 
     def propose(self, context: MutationContext) -> float:
@@ -58,7 +60,7 @@ class RandomizedScaleFactor:
         if not (0.0 < self.lower <= self.upper):
             raise ValueError("RandomizedScaleFactor requires 0 < lower <= upper.")
 
-    def initialize(self, population_size: int, rng: object) -> None:
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
         return None
 
     def propose(self, context: MutationContext) -> float:
@@ -97,7 +99,7 @@ class AdaptiveScaleFactor:
         if not 0.0 <= self.tau <= 1.0:
             raise ValueError("tau must be between 0 and 1.")
 
-    def initialize(self, population_size: int, rng: object) -> None:
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
         self._values = [self.initial for _ in range(population_size)]
         self._pending.clear()
 
@@ -106,6 +108,8 @@ class AdaptiveScaleFactor:
         if target_index in self._pending:
             return self._pending[target_index]
 
+        if not self._values:
+            self.initialize(len(context.population), context.rng)
         value = self._values[target_index]
         if context.rng.random() < self.tau:
             value = context.rng.uniform(self.lower, self.upper)

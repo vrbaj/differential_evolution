@@ -13,5 +13,12 @@ __pycache__/
 .pytest_cache/
 docs/_build/
 
-# Accidental shell output
+# Build and analysis artifacts
+build/
+*.egg-info/
+.mypy_cache/
+.ruff_cache/
+docs/api/generated/
+
+# Existing local shell artifact
 /=8,
