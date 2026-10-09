@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "defoundry"
+version = "0.1.0"
+description = "Composable Differential Evolution optimizer"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Honza" }]
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["optimization", "differential-evolution", "global-optimization"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=7", "mypy>=1.10", "ruff>=0.6"]
+release = ["build>=1.2", "twine>=6"]
+docs = [
+    "Sphinx>=8,<9",
+    "sphinxcontrib-bibtex>=2.6,<3",
+    "sphinx-rtd-theme>=3,<4",
+]
+
+[tool.setuptools.packages.find]
+include = ["differential_evolution*"]
+
+[project.urls]
+Repository = "https://github.com/vrbaj/differential_evolution"
+Issues = "https://github.com/vrbaj/differential_evolution/issues"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools.package-data]
+differential_evolution = ["py.typed"]
+
+# Historical review reproductions and the unrelated paper draft are artifacts.
+[tool.ruff]
+extend-exclude = ["review_*", "paper_template"]
+
+[tool.ruff.lint]
+select = ["F", "B", "RUF", "SIM", "PERF"]
+
+[tool.mypy]
+files = ["differential_evolution", "scripts", "main.py", "population_initialization.py",
+         "testing_functions.py", "examples", "tests", "docs/conf.py"]

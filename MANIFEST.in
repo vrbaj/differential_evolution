@@ -1,0 +1,9 @@
+include LICENSE README.md MIGRATION.md ALGORITHM_AUDIT.md RELEASE.md
+include main.py population_initialization.py testing_functions.py
+recursive-include tests *.py
+recursive-include examples *.py
+recursive-include scripts *.py
+recursive-include docs *.rst *.md *.py *.bib *.css
+prune docs/_build
+prune docs/api/generated
+global-exclude __pycache__ *.py[cod]

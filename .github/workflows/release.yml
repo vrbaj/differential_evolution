@@ -1,0 +1,57 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      index:
+        description: Package index (select a version tag as the workflow ref)
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}-${{ inputs.index }}
+  cancel-in-progress: false
+
+jobs:
+  validate-tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Require a version tag matching the package metadata
+        run: |
+          python - <<'PY'
+          import os
+          import tomllib
+          from pathlib import Path
+          project = tomllib.loads(Path('pyproject.toml').read_text())['project']
+          expected = 'refs/tags/v' + project['version']
+          if os.environ['GITHUB_REF'] != expected:
+              raise SystemExit(f'Select the release tag {expected}; branch releases are disabled.')
+          PY
+
+  checks:
+    needs: validate-tag
+    uses: ./.github/workflows/tests.yml
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.index }}
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: python-distributions
+          path: dist
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: ${{ inputs.index == 'testpypi' && 'https://test.pypi.org/legacy/' || 'https://upload.pypi.org/legacy/' }}

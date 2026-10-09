@@ -1,0 +1,653 @@
+"""Mutation strategies and index sampling for Differential Evolution."""
+
+from __future__ import annotations
+
+from .protocols import RandomSource
+from ._numeric import mean, sum_differences
+
+import math
+from typing import Any, Protocol, TYPE_CHECKING
+from dataclasses import Field, fields
+from dataclasses import dataclass, field
+from inspect import signature
+
+
+if TYPE_CHECKING:
+    from .scales import ScaleFactorController
+
+
+_FIELD_CACHE: dict[type, tuple[Field[Any], ...]] = {}
+
+
+def _component_fields(cls: type) -> tuple[Field[Any], ...]:
+    if cls not in _FIELD_CACHE:
+        _FIELD_CACHE[cls] = fields(cls)
+    return _FIELD_CACHE[cls]
+
+
+Population = list[list[float]]
+
+
+def sample_distinct_indices(
+    population_size: int,
+    count: int,
+    rng: RandomSource,
+    excluded: tuple[int, ...] = (),
+) -> list[int]:
+    """Sample distinct population indices while excluding reserved indices.
+
+    Parameters
+    ----------
+    population_size
+        Number of currently available population members.
+    count
+        Number of distinct indices to draw.
+    rng
+        Random-generator-like object exposing ``sample(population, k)``.
+    excluded
+        Indices that must not appear in the result.
+
+    Returns
+    -------
+    list[int]
+        ``count`` mutually distinct indices.
+
+    Raises
+    ------
+    ValueError
+        If too few eligible indices remain.
+    """
+
+    excluded_set = {index for index in excluded if 0 <= index < population_size}
+    eligible_count = population_size - len(excluded_set)
+    if count < 0 or count > eligible_count:
+        raise ValueError(
+            "Population too small for the requested mutation strategy and exclusions."
+        )
+    if population_size > 32 and 4 * count <= eligible_count:
+        # Sample compact ranks, then map them past the excluded indices.
+        blocked = sorted(excluded_set)
+        selected = []
+        for index in rng.sample(range(eligible_count), count):
+            for excluded_index in blocked:
+                if excluded_index > index:
+                    break
+                index += 1
+            selected.append(index)
+        return selected
+    available = [index for index in range(population_size) if index not in excluded_set]
+    if count > len(available):
+        raise ValueError(
+            "Population too small for the requested mutation strategy and exclusions."
+        )
+    return list(rng.sample(available, count))
+
+
+@dataclass(frozen=True)
+class MutationContext:
+    """Immutable information available to a mutation strategy.
+
+    The fields expose the population snapshot, aligned fitness values, the
+    current target index, the current best individual, coordinate bounds, and
+    the shared random-generator-like object. Mutation operators should treat
+    the stored population as read-only and return a new donor vector.
+    """
+
+    population: Population
+    fitness: list[float]
+    target_index: int
+    best_index: int
+    best_vector: list[float]
+    bounds: list[tuple[float, float]]
+    rng: RandomSource
+
+
+class MutationOperator(Protocol):
+    """Create a donor from a read-only generation snapshot."""
+
+    def __call__(self, context: MutationContext) -> list[float]: ...
+
+
+class BaseMutation:
+    """Shared helper for mutation strategies."""
+
+    def __post_init__(self) -> None:
+        for definition in _component_fields(type(self)):
+            if definition.name in ("scale", "difference_scale", "fallback_scale"):
+                value = getattr(self, definition.name)
+                if value is None:
+                    if definition.name != "difference_scale":
+                        raise TypeError(
+                            f"{definition.name} must be a number or a scale-factor controller."
+                        )
+                    continue
+                if hasattr(value, "propose"):
+                    try:
+                        signature(value.propose).bind(None)
+                    except (TypeError, ValueError) as error:
+                        raise TypeError(
+                            "Expected a scale-factor controller with propose(context)."
+                        ) from error
+                else:
+                    self._validate_scale(float(value))
+
+    @staticmethod
+    def _validate_scale(value: float) -> float:
+        if not math.isfinite(value):
+            raise ValueError("Scale factors must be finite.")
+        return value
+
+    def _require_dimension(self, context: MutationContext) -> None:
+        if not context.population:
+            raise ValueError("Population must be initialized before mutation.")
+
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
+        for controller in self._scale_controllers():
+            controller.initialize(population_size, rng)
+
+    def commit(self, target_index: int, accepted: bool) -> None:
+        for controller in self._scale_controllers():
+            controller.commit(target_index, accepted)
+
+    def resize(self, kept_indices: list[int]) -> None:
+        for controller in self._scale_controllers():
+            if hasattr(controller, "resize"):
+                controller.resize(kept_indices)
+
+    def _resolve_scale(
+        self, value: float | ScaleFactorController, context: MutationContext
+    ) -> float:
+        if hasattr(value, "propose"):
+            return self._validate_scale(float(value.propose(context)))
+        return self._validate_scale(float(value))
+
+    def _scale_controllers(self) -> list[ScaleFactorController]:
+        seen: set[int] = set()
+        controllers = []
+        for field_definition in _component_fields(type(self)):
+            value = getattr(self, field_definition.name)
+            if (
+                hasattr(value, "initialize")
+                and hasattr(value, "propose")
+                and hasattr(value, "commit")
+                and id(value) not in seen
+            ):
+                seen.add(id(value))
+                controllers.append(value)
+        return controllers
+
+
+@dataclass(frozen=True)
+class Rand1(BaseMutation):
+    """DE/rand/1 donor mutation."""
+
+    scale: float | ScaleFactorController
+
+    required_population_size = 4
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        r1, r2, r3 = sample_distinct_indices(
+            len(context.population),
+            3,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        return [
+            sum_differences(
+                context.population[r1][dimension],
+                (scale, context.population[r2][dimension], context.population[r3][dimension]),
+            )
+            for dimension in range(len(context.population[context.target_index]))
+        ]
+
+
+@dataclass(frozen=True)
+class Rand2(BaseMutation):
+    """DE/rand/2 donor mutation."""
+
+    scale: float | ScaleFactorController
+
+    required_population_size = 6
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        r1, r2, r3, r4, r5 = sample_distinct_indices(
+            len(context.population),
+            5,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        return [
+            sum_differences(
+                context.population[r1][dimension],
+                (scale, context.population[r2][dimension], context.population[r3][dimension]),
+                (scale, context.population[r4][dimension], context.population[r5][dimension]),
+            )
+            for dimension in range(len(context.population[context.target_index]))
+        ]
+
+
+@dataclass(frozen=True)
+class Best1(BaseMutation):
+    """DE/best/1 donor mutation."""
+
+    scale: float | ScaleFactorController
+
+    required_population_size = 3
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        r1, r2 = sample_distinct_indices(
+            len(context.population),
+            2,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        return [
+            sum_differences(
+                context.best_vector[dimension],
+                (scale, context.population[r1][dimension], context.population[r2][dimension]),
+            )
+            for dimension in range(len(context.population[context.target_index]))
+        ]
+
+
+@dataclass(frozen=True)
+class Best2(BaseMutation):
+    """DE/best/2 donor mutation."""
+
+    scale: float | ScaleFactorController
+
+    required_population_size = 5
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        r1, r2, r3, r4 = sample_distinct_indices(
+            len(context.population),
+            4,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        return [
+            sum_differences(
+                context.best_vector[dimension],
+                (scale, context.population[r1][dimension], context.population[r2][dimension]),
+                (scale, context.population[r3][dimension], context.population[r4][dimension]),
+            )
+            for dimension in range(len(context.population[context.target_index]))
+        ]
+
+
+@dataclass(frozen=True)
+class CurrentToBest1(BaseMutation):
+    """DE/current-to-best/1 with an optional separate difference scale."""
+
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 3
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
+        r1, r2 = sample_distinct_indices(
+            len(context.population),
+            2,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        target_vector = context.population[context.target_index]
+        return [
+            sum_differences(
+                target_vector[dimension],
+                (scale, context.best_vector[dimension], target_vector[dimension]),
+                (difference_scale, context.population[r1][dimension], context.population[r2][dimension]),
+            )
+            for dimension in range(len(target_vector))
+        ]
+
+
+@dataclass(frozen=True)
+class CurrentToBest2(BaseMutation):
+    """DE/current-to-best/2 with an optional separate difference scale."""
+
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 5
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
+        r1, r2, r3, r4 = sample_distinct_indices(
+            len(context.population),
+            4,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        target_vector = context.population[context.target_index]
+        return [
+            sum_differences(
+                target_vector[dimension],
+                (scale, context.best_vector[dimension], target_vector[dimension]),
+                (difference_scale, context.population[r1][dimension], context.population[r2][dimension]),
+                (difference_scale, context.population[r3][dimension], context.population[r4][dimension]),
+            )
+            for dimension in range(len(target_vector))
+        ]
+
+
+@dataclass(frozen=True)
+class CurrentToRand1(BaseMutation):
+    """DE/current-to-rand/1 donor mutation."""
+
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 4
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
+        r1, r2, r3 = sample_distinct_indices(
+            len(context.population),
+            3,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        target_vector = context.population[context.target_index]
+        return [
+            sum_differences(
+                target_vector[dimension],
+                (scale, context.population[r1][dimension], target_vector[dimension]),
+                (difference_scale, context.population[r2][dimension], context.population[r3][dimension]),
+            )
+            for dimension in range(len(target_vector))
+        ]
+
+
+@dataclass(frozen=True)
+class CurrentToRand2(BaseMutation):
+    """DE/current-to-rand/2 donor mutation."""
+
+    scale: float | ScaleFactorController
+    difference_scale: float | ScaleFactorController | None = None
+
+    required_population_size = 6
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        scale = self._resolve_scale(self.scale, context)
+        difference_scale = (
+            scale
+            if self.difference_scale is None
+            else self._resolve_scale(self.difference_scale, context)
+        )
+        r1, r2, r3, r4, r5 = sample_distinct_indices(
+            len(context.population),
+            5,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        target_vector = context.population[context.target_index]
+        return [
+            sum_differences(
+                target_vector[dimension],
+                (scale, context.population[r1][dimension], target_vector[dimension]),
+                (difference_scale, context.population[r2][dimension], context.population[r3][dimension]),
+                (difference_scale, context.population[r4][dimension], context.population[r5][dimension]),
+            )
+            for dimension in range(len(target_vector))
+        ]
+
+
+@dataclass(frozen=True)
+class TrigonometricMutation(BaseMutation):
+    """Fan-Lampinen trigonometric mutation with DE/rand/1 fallback.
+
+    With probability ``probability`` this applies the trigonometric
+    mutation operator from Fan and Lampinen (2003). Otherwise it applies
+    the usual ``DE/rand/1`` donor formula using the same sampled indices.
+    Absolute-fitness weights make this published operator sensitive to objective offsets.
+    """
+
+    probability: float
+    scale: float | ScaleFactorController
+
+    required_population_size = 4
+
+    def __post_init__(self) -> None:
+        super().__post_init__()
+        if not 0.0 <= self.probability <= 1.0:
+            raise ValueError("probability must be between 0 and 1.")
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        r1, r2, r3 = sample_distinct_indices(
+            len(context.population),
+            3,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        if context.rng.random() < self.probability:
+            return self._trigonometric_donor(context, r1, r2, r3)
+        return self._rand1_donor(context, r1, r2, r3)
+
+    def _rand1_donor(
+        self,
+        context: MutationContext,
+        r1: int,
+        r2: int,
+        r3: int,
+    ) -> list[float]:
+        scale = self._resolve_scale(self.scale, context)
+        return [
+            sum_differences(
+                context.population[r1][dimension],
+                (scale, context.population[r2][dimension], context.population[r3][dimension]),
+            )
+            for dimension in range(len(context.population[context.target_index]))
+        ]
+
+    def _trigonometric_donor(
+        self,
+        context: MutationContext,
+        r1: int,
+        r2: int,
+        r3: int,
+    ) -> list[float]:
+        selected_fitness = [
+            context.fitness[r1],
+            context.fitness[r2],
+            context.fitness[r3],
+        ]
+        absolute_sum = sum(abs(value) for value in selected_fitness)
+        if not math.isfinite(absolute_sum):
+            return self._rand1_donor(context, r1, r2, r3)
+        if absolute_sum == 0.0:
+            weights = [1.0 / 3.0, 1.0 / 3.0, 1.0 / 3.0]
+        else:
+            weights = [abs(value) / absolute_sum for value in selected_fitness]
+
+        vector_1 = context.population[r1]
+        vector_2 = context.population[r2]
+        vector_3 = context.population[r3]
+        mean_vector = [
+            mean((value_1, value_2, value_3), total=value_1 + value_2 + value_3)
+            for value_1, value_2, value_3 in zip(
+                vector_1, vector_2, vector_3, strict=True
+            )
+        ]
+        p1, p2, p3 = weights
+        return [
+            sum_differences(
+                mean_value,
+                (p2 - p1, value_1, value_2),
+                (p3 - p2, value_2, value_3),
+                (p1 - p3, value_3, value_1),
+            )
+            for mean_value, value_1, value_2, value_3 in zip(
+                mean_vector, vector_1, vector_2, vector_3, strict=True
+            )
+        ]
+
+
+@dataclass(frozen=True)
+class DirectedMutation(BaseMutation):
+    """Project-specific normalized directed mutation with DE/rand/1 fallback.
+
+    The sampled triple is ordered by objective value. The best sampled vector
+    becomes the base vector and the two worse vectors define the directed
+    extrapolation terms, weighted by normalized fitness gaps in [0, 1].
+    Constant or non-finite fitness falls back to DE/rand/1. This is a project
+    variant; correspondence with Fan-Lampinen directed mutation is unverified.
+    """
+
+    fallback_scale: float | ScaleFactorController = 1.0
+    fallback_count: int = field(default=0, init=False, compare=False)
+
+    def initialize(self, population_size: int, rng: RandomSource) -> None:
+        object.__setattr__(self, "fallback_count", 0)
+        super().initialize(population_size, rng)
+
+    required_population_size = 4
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        sampled = sample_distinct_indices(
+            len(context.population),
+            3,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        ordered = sorted(sampled, key=lambda index: context.fitness[index])
+        best_index, worse_index_1, worse_index_2 = ordered
+
+        best_fitness = context.fitness[best_index]
+        worse_fitness_1 = context.fitness[worse_index_1]
+        worse_fitness_2 = context.fitness[worse_index_2]
+
+        if not all(
+            math.isfinite(value)
+            for value in (best_fitness, worse_fitness_1, worse_fitness_2)
+        ):
+            return self._rand1_fallback(context, sampled)
+
+        best_vector = context.population[best_index]
+        worse_vector_1 = context.population[worse_index_1]
+        worse_vector_2 = context.population[worse_index_2]
+
+        magnitude = max(
+            abs(best_fitness), abs(worse_fitness_1), abs(worse_fitness_2), 1e-300
+        )
+        best = best_fitness / magnitude
+        span = worse_fitness_2 / magnitude - best
+        if span == 0.0:
+            return self._rand1_fallback(context, sampled)
+        coefficient_1 = (worse_fitness_1 / magnitude - best) / span
+        coefficient_2 = 1.0
+
+        return [
+            sum_differences(
+                best_value,
+                (coefficient_1, best_value, worse_value_1),
+                (coefficient_2, best_value, worse_value_2),
+            )
+            for best_value, worse_value_1, worse_value_2 in zip(
+                best_vector, worse_vector_1, worse_vector_2, strict=True
+            )
+        ]
+
+    def _rand1_fallback(
+        self,
+        context: MutationContext,
+        sampled: list[int],
+    ) -> list[float]:
+        object.__setattr__(self, "fallback_count", self.fallback_count + 1)
+        r1, r2, r3 = sampled
+        scale = self._resolve_scale(self.fallback_scale, context)
+        return [
+            sum_differences(
+                context.population[r1][dimension],
+                (scale, context.population[r2][dimension], context.population[r3][dimension]),
+            )
+            for dimension in range(len(context.population[context.target_index]))
+        ]
+
+
+@dataclass(frozen=True)
+class NeighborhoodSearchMutation(BaseMutation):
+    """Neighborhood Search Differential Evolution mutation.
+
+    This implements the NSDE mutation described by Yang, He, and Yao:
+
+    ``v_i = x_r1 + d_i * N(mu, sigma)`` with probability ``gaussian_probability``
+    and ``v_i = x_r1 + d_i * Cauchy(0, cauchy_scale)`` otherwise, where
+    ``d_i = x_r2 - x_r3``.
+    """
+
+    gaussian_probability: float = 0.5
+    gaussian_mean: float = 0.5
+    gaussian_stddev: float = 0.5
+    cauchy_scale: float = 1.0
+
+    required_population_size = 4
+
+    def __post_init__(self) -> None:
+        for name in ("gaussian_probability", "gaussian_mean", "gaussian_stddev", "cauchy_scale"):
+            if not math.isfinite(getattr(self, name)):
+                raise ValueError(f"{name} must be finite.")
+        if not 0.0 <= self.gaussian_probability <= 1.0:
+            raise ValueError("gaussian_probability must be between 0 and 1.")
+        if self.gaussian_stddev < 0.0:
+            raise ValueError("gaussian_stddev must be non-negative.")
+        if self.cauchy_scale <= 0.0:
+            raise ValueError("cauchy_scale must be positive.")
+
+    def __call__(self, context: MutationContext) -> list[float]:
+        self._require_dimension(context)
+        r1, r2, r3 = sample_distinct_indices(
+            len(context.population),
+            3,
+            context.rng,
+            excluded=(context.target_index,),
+        )
+        factor = self._sample_factor(context.rng)
+        return [
+            sum_differences(
+                context.population[r1][dimension],
+                (factor, context.population[r2][dimension], context.population[r3][dimension]),
+            )
+            for dimension in range(len(context.population[context.target_index]))
+        ]
+
+    def _sample_factor(self, rng: RandomSource) -> float:
+        if rng.random() < self.gaussian_probability:
+            return rng.gauss(self.gaussian_mean, self.gaussian_stddev)
+        return self._sample_cauchy(rng)
+
+    def _sample_cauchy(self, rng: RandomSource) -> float:
+        uniform = rng.random()
+        while uniform <= 0.0 or uniform >= 1.0:
+            uniform = rng.random()
+        return self.cauchy_scale * math.tan(math.pi * (uniform - 0.5))

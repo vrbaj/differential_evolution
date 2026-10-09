@@ -1,0 +1,2 @@
+# The refactored library has no mandatory third-party runtime dependencies.
+# Standard-library Python 3.11+ is sufficient.
