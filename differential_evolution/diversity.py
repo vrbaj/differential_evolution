@@ -345,3 +345,46 @@ def resolve_diversity_measures(
     if len(names) != len(set(names)):
         raise ValueError("Diversity measure names must be unique (including aliases).")
     return measures
+
+
+@dataclass(frozen=True)
+class BoundNormalizedDiversity:
+    """Apply any measure in dimensionless bound coordinates.
+
+    Fixed coordinates map to zero. Out-of-bound coordinates are not clipped.
+    Previous populations use the same transformation for movement measures.
+    """
+
+    measure: DiversityMeasure
+
+    @property
+    def name(self) -> str:
+        return f"normalized_{self.measure.name}"
+
+    def __call__(
+        self, population: Population, bounds: Bounds,
+        previous_population: Population | None = None,
+    ) -> float:
+        if not bounds or any(not math.isfinite(lower) or not math.isfinite(upper)
+                             or lower > upper for lower, upper in bounds):
+            raise ValueError("Normalization requires finite ordered bounds.")
+
+        def normalize(points: Population) -> Population:
+            result = []
+            for point in points:
+                if len(point) != len(bounds) or any(not math.isfinite(value) for value in point):
+                    raise ValueError("Normalized coordinates must be finite and match bounds.")
+                vector = []
+                for value, (lower, upper) in zip(point, bounds, strict=True):
+                    width = upper - lower
+                    if lower == upper:
+                        vector.append(0.0)
+                    elif math.isfinite(width) and math.isfinite(value - lower):
+                        vector.append((value - lower) / width)
+                    else:
+                        vector.append((value / 2 - lower / 2) / (upper / 2 - lower / 2))
+                result.append(vector)
+            return result
+
+        return self.measure(normalize(population), [(0.0, 1.0)] * len(bounds),
+                            None if previous_population is None else normalize(previous_population))

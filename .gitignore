@@ -20,3 +20,10 @@ dist/
 .mypy_cache/
 .ruff_cache/
 docs/api/generated/
+
+# Local manuscript and experiment artifacts are not part of the repository
+/paper_template/
+
+# Local manuscript reviews
+/review_differential_evolution.md
+/review_jocs_defoundry.md

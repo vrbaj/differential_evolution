@@ -1,5 +1,7 @@
 """Composable Differential Evolution optimizer."""
 
+from ._version import __version__
+
 from .benchmarks import (
     ackley_function,
     beale_function,
@@ -35,6 +37,7 @@ from .initializers import (
 )
 from .diversity import (
     AggregatedDistribution,
+    BoundNormalizedDiversity,
     AverageDistanceAroundAllIndividuals,
     AverageDistanceAroundPopulationCenter,
     AveragePairwiseDistance,
@@ -80,6 +83,7 @@ __all__ = [
     "Best1",
     "Best2",
     "BinomialCrossover",
+    "BoundNormalizedDiversity",
     "ClipBoundaryHandler",
     "ConstantCrossoverRate",
     "ConstantScaleFactor",
@@ -114,6 +118,7 @@ __all__ = [
     "SobolInitializer",
     "TentInitializer",
     "TrigonometricMutation",
+    "__version__",
     "ackley_function",
     "beale_function",
     "booth_function",

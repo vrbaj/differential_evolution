@@ -132,3 +132,24 @@ Reflection requires a finite trial coordinate.
 SHADE/L-SHADE now archive only strictly improved parents, after all processed
 trials in a generation have been generated. Tied trials still survive selection
 but do not enter the archive. These corrections change seeded trajectories.
+
+## 0.2.0
+
+- Generic `DifferentialEvolution` now defaults to `BinomialCrossover(0.9)`.
+  To preserve 0.1.0 donor-only trajectories, explicitly pass
+  `crossover=IdentityCrossover()`. Dedicated SHADE/L-SHADE trial rules are unchanged.
+- `ackley_function` accepts any non-empty dimension; its two-dimensional formula
+  is preserved to floating-point precision. Other fixed-dimensional functions
+  retain their dimension checks.
+- Results include seed, Python/package versions, initial configuration and
+  initial `random.Random` state. Custom callables/data are identified, not fully
+  serialized; keep their source and input data with the history.
+- Optional `batch_objective(candidates)` returns one value per candidate in input
+  order. Use it with a vectorized function or an ordered external `executor.map`.
+  Initialization and budget-limited trial prefixes can be batched. Ranked
+  initializers still use the required scalar objective to rank their candidates.
+  Batch errors propagate even in penalty mode; all submitted candidates count
+  against the budget. Custom controllers must tolerate delayed commits after
+  batch evaluation; arbitrary inter-target side effects are not preserved.
+- `BoundNormalizedDiversity(measure)` computes diagnostics in bound coordinates;
+  fixed coordinates map to zero, and out-of-bound coordinates are not clipped.

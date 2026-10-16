@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import warnings
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from typing import ClassVar
 
@@ -88,33 +89,44 @@ class SHADE(DifferentialEvolution):
         archived_parents: list[list[float]] = []
         processed_targets = 0
 
+        def prepare(target_index):
+            target_vector = population_snapshot[target_index]
+            memory_slot = self._rng.randrange(self.memory_size)
+            scale_factor = self._sample_scale_factor(memory_slot)
+            crossover_rate = self._sample_crossover_rate(memory_slot)
+            p_best_index = self._sample_p_best_index(
+                target_index, fitness_snapshot, ranked_indices
+            )
+            r1_index = self._sample_r1_index(target_index, p_best_index)
+            r2_vector = self._sample_r2_vector(target_index, p_best_index, r1_index)
+
+            donor_vector = [
+                sum_differences(
+                    target_value,
+                    (scale_factor, population_snapshot[p_best_index][dimension], target_value),
+                    (scale_factor, population_snapshot[r1_index][dimension], r2_vector[dimension]),
+                )
+                for dimension, target_value in enumerate(target_vector)
+            ]
+            trial_vector = self._binomial_crossover(
+                target_vector, donor_vector, crossover_rate
+            )
+            bounded_trial = self._repair_trial(trial_vector, target_vector)
+            return target_index, bounded_trial, scale_factor, crossover_rate
+
         try:
-            for target_index, target_vector in enumerate(population_snapshot):
-                if self.max_evaluations is not None and self.nfev >= self.max_evaluations:
-                    break
-
-                memory_slot = self._rng.randrange(self.memory_size)
-                scale_factor = self._sample_scale_factor(memory_slot)
-                crossover_rate = self._sample_crossover_rate(memory_slot)
-                p_best_index = self._sample_p_best_index(
-                    target_index, fitness_snapshot, ranked_indices
-                )
-                r1_index = self._sample_r1_index(target_index, p_best_index)
-                r2_vector = self._sample_r2_vector(target_index, p_best_index, r1_index)
-
-                donor_vector = [
-                    sum_differences(
-                        target_value,
-                        (scale_factor, population_snapshot[p_best_index][dimension], target_value),
-                        (scale_factor, population_snapshot[r1_index][dimension], r2_vector[dimension]),
-                    )
-                    for dimension, target_value in enumerate(target_vector)
-                ]
-                trial_vector = self._binomial_crossover(
-                    target_vector, donor_vector, crossover_rate
-                )
-                bounded_trial = self._repair_trial(trial_vector, target_vector)
-                trial_fitness = self._evaluate_vector(bounded_trial)
+            count = len(population_snapshot)
+            if self.max_evaluations is not None:
+                count = min(count, self.max_evaluations - self.nfev)
+            evaluated: Iterator[tuple[tuple[int, list[float], float, float], float]]
+            if self.batch_objective is None:
+                prepared = (prepare(index) for index in range(count))
+                evaluated = ((item, self._evaluate_vector(item[1])) for item in prepared)
+            else:
+                batch = [prepare(index) for index in range(count)]
+                evaluated = iter(zip(batch, self._evaluate_vectors([item[1] for item in batch]), strict=True))
+            for (target_index, bounded_trial, scale_factor, crossover_rate), trial_fitness in evaluated:
+                target_vector = population_snapshot[target_index]
                 improvement = fitness_snapshot[target_index] - trial_fitness
                 accepted = trial_fitness <= fitness_snapshot[target_index]
 

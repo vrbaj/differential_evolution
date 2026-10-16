@@ -23,6 +23,7 @@ results and inspect runs after they finish.
    quickstart
    concepts
    algorithm_reference
+   execution_and_provenance
    customization
    practical_guides
    examples

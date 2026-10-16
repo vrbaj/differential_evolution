@@ -9,7 +9,8 @@ import math
 import random
 import warnings
 from copy import deepcopy
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
+import platform
 from typing import Callable, ClassVar
 
 from .diversity import (
@@ -21,14 +22,16 @@ from .diversity import (
     AveragePairwiseDistance,
     AverageDistanceAroundAllIndividuals,
 )
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from .boundaries import BoundaryHandler, ClipBoundaryHandler
-from .crossovers import CrossoverOperator, IdentityCrossover
+from .crossovers import BinomialCrossover, CrossoverOperator
 from .history import GenerationSnapshot
 from .initializers import PopulationInitializer, RandomInitializer
 from .mutation import MutationContext, MutationOperator
 from .population_schedules import PopulationSchedule, PopulationScheduleState
 from .result import OptimizeResult
+from .provenance import describe
+from ._version import __version__
 
 
 ObjectiveFunction = Callable[[list[float]], float]
@@ -53,7 +56,7 @@ class DifferentialEvolution:
         Callable receiving :class:`~differential_evolution.MutationContext`
         and returning one donor vector of length ``D``.
     crossover
-        Callable combining the target and donor vectors into one trial vector.
+        Callable combining target and donor vectors; defaults to binomial CR=0.9.
     max_generations
         Maximum number of generations, including a final partial generation.
         Defaults to None (no generation limit); at least one stopping limit
@@ -84,6 +87,15 @@ class DifferentialEvolution:
         Explicit random-generator-like object. Pass either ``seed`` or
         ``rng``, not both.
 
+    batch_objective
+        Optional ordered evaluator accepting a list of candidates and returning
+        one scalar per candidate. Supports vectorization or external worker
+        pools. The scalar objective is still required by ranked initializers.
+        All submitted candidates count against the budget, even on failure.
+        Batch exceptions propagate; per-candidate penalties belong in the
+        evaluator. Custom controller commits occur after batch evaluation;
+        do not rely on inter-target commit side effects in this mode.
+
     Notes
     -----
     Selection is strict one-to-one minimization: a trial replaces its target
@@ -94,7 +106,7 @@ class DifferentialEvolution:
     bounds: list[tuple[float, float]]
     population_size: int
     mutation: MutationOperator
-    crossover: CrossoverOperator = field(default_factory=IdentityCrossover)
+    crossover: CrossoverOperator = field(default_factory=lambda: BinomialCrossover(0.9))
     max_generations: int | None = None
     initializer: PopulationInitializer = field(default_factory=RandomInitializer)
     boundary_handler: BoundaryHandler = field(default_factory=ClipBoundaryHandler)
@@ -108,6 +120,9 @@ class DifferentialEvolution:
     objective_errors: str = "raise"
     seed: int | None = None
     rng: RandomSource | None = None
+    batch_objective: Callable[[list[list[float]]], Iterable[float]] | None = field(
+        default=None, kw_only=True
+    )
 
     # Skip the generated __init__ and cooperative __post_init__ frames.
     _warning_stacklevel: ClassVar[int] = 3
@@ -179,8 +194,15 @@ class DifferentialEvolution:
                 stacklevel=self._warning_stacklevel,
             )
         self.mutation, self.crossover = deepcopy((self.mutation, self.crossover))
+        self._configuration = {
+            item.name: describe(getattr(self, item.name))
+            for item in fields(self) if item.init and item.name != "rng"
+        }
         self._has_run = False
         self._rng = self.rng if self.rng is not None else random.Random(self.seed)
+        self._initial_random_state = (
+            self._rng.getstate() if isinstance(self._rng, random.Random) else None
+        )
         if hasattr(self.mutation, "initialize"):
             self.mutation.initialize(self.population_size, self._rng)
         if hasattr(self.crossover, "initialize"):
@@ -227,11 +249,11 @@ class DifferentialEvolution:
             self._rng,
         )
         self._validate_population(self.population)
+        missing = [individual for individual in self.population if tuple(individual) not in evaluated]
+        missing_fitness = iter(self._evaluate_vectors(missing))
         self.fitness = [
-            evaluated[tuple(individual)]
-            if tuple(individual) in evaluated
-            else self._evaluate_vector(individual)
-            for individual in self.population
+            evaluated[tuple(individual)] if tuple(individual) in evaluated
+            else next(missing_fitness) for individual in self.population
         ]
         self._record_best()
         self._record_diversity(previous_population=None)
@@ -307,9 +329,8 @@ class DifferentialEvolution:
         next_fitness = list(fitness_snapshot)
         processed_targets = 0
 
-        for target_index, target_vector in enumerate(population_snapshot):
-            if self.max_evaluations is not None and self.nfev >= self.max_evaluations:
-                break
+        def prepare(target_index):
+            target_vector = population_snapshot[target_index]
             context = MutationContext(
                 population=population_snapshot,
                 fitness=fitness_snapshot,
@@ -324,7 +345,20 @@ class DifferentialEvolution:
             donor_vector = self.mutation(context)
             trial_vector = self.crossover(target_vector, donor_vector, self._rng)
             bounded_trial = self._repair_trial(trial_vector, target_vector)
-            trial_fitness = self._evaluate_vector(bounded_trial)
+            return bounded_trial
+
+        count = len(population_snapshot)
+        if self.max_evaluations is not None:
+            count = min(count, self.max_evaluations - self.nfev)
+        evaluated_trials: Iterator[tuple[int, list[float], float]]
+        if self.batch_objective is None:
+            trials = ((index, prepare(index)) for index in range(count))
+            evaluated_trials = ((index, vector, self._evaluate_vector(vector))
+                                for index, vector in trials)
+        else:
+            vectors = [prepare(index) for index in range(count)]
+            evaluated_trials = iter(zip(range(count), vectors, self._evaluate_vectors(vectors), strict=True))
+        for target_index, bounded_trial, trial_fitness in evaluated_trials:
             accepted = trial_fitness < fitness_snapshot[target_index]
             if accepted:
                 next_population[target_index] = bounded_trial
@@ -430,6 +464,14 @@ class DifferentialEvolution:
     def _result_metadata(self) -> dict[str, object]:
         return {
             "algorithm": self.__class__.__name__,
+            "package_version": __version__,
+            "python_version": platform.python_version(),
+            "python_implementation": platform.python_implementation(),
+            "seed": self.seed,
+            "evaluation_mode": "batch" if self.batch_objective is not None else "scalar",
+            "random_source": describe(self._rng),
+            "initial_random_state": self._initial_random_state,
+            "configuration": deepcopy(self._configuration),
             "mutation_fallbacks": getattr(self.mutation, "fallback_count", 0),
             "termination_reason": "max_evaluations"
             if self.max_evaluations is not None and self.nfev >= self.max_evaluations
@@ -463,6 +505,31 @@ class DifferentialEvolution:
         if hasattr(self.crossover, "resize"):
             self.crossover.resize(kept_indices)
         return kept_indices
+
+    def _evaluate_vectors(self, vectors: list[list[float]]) -> list[float]:
+        """Evaluate an ordered batch; charge every submitted candidate.
+
+        Batch exceptions always propagate. A batch implementation must handle
+        per-candidate domain errors itself and must return exactly one scalar
+        per candidate, in input order. An invalid batch still consumes budget.
+        Ranked initializers may continue to call the scalar objective to rank
+        their candidate pool; ordinary initialization uses this batch path.
+        """
+        if not vectors:
+            return []
+        if self.batch_objective is None:
+            return [self._evaluate_vector(vector) for vector in vectors]
+        if self.max_evaluations is not None and self.nfev + len(vectors) > self.max_evaluations:
+            raise ValueError("Batch exceeds remaining evaluation budget.")
+        if any(len(vector) != len(self.bounds) or
+               any(not math.isfinite(value) for value in vector) for vector in vectors):
+            raise ValueError("Batch coordinates must be finite and match bounds.")
+        self.nfev += len(vectors)
+        values = list(self.batch_objective([list(vector) for vector in vectors]))
+        if len(values) != len(vectors):
+            raise ValueError("batch_objective must return one value per candidate in input order.")
+        fitness = [float(value) for value in values]
+        return [math.inf if math.isnan(value) else value for value in fitness]
 
     def _evaluate_vector(self, vector: list[float]) -> float:
         if len(vector) != len(self.bounds):

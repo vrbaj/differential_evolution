@@ -1,6 +1,8 @@
 name: release
 
 on:
+  push:
+    tags: ['v*']
   workflow_dispatch:
     inputs:
       index:
@@ -14,7 +16,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}-${{ inputs.index }}
+  group: release-${{ github.ref }}-${{ inputs.index || 'pypi' }}
   cancel-in-progress: false
 
 jobs:
@@ -44,7 +46,7 @@ jobs:
   publish:
     needs: checks
     runs-on: ubuntu-latest
-    environment: ${{ inputs.index }}
+    environment: ${{ inputs.index || 'pypi' }}
     permissions:
       id-token: write
     steps:

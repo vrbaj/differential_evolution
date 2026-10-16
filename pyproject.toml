@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "defoundry"
-version = "0.1.0"
+version = "0.2.0"
 description = "Composable Differential Evolution optimizer"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -27,6 +27,10 @@ classifiers = [
 [project.optional-dependencies]
 test = ["pytest>=7", "mypy>=1.10", "ruff>=0.6"]
 release = ["build>=1.2", "twine>=6"]
+paper = [
+    "numpy==2.5.4", "scipy==1.18.1", "pymoo==0.6.2",
+    "coco-experiment==2.8.2", "matplotlib==3.11.2", "coverage==7.16.2",
+]
 docs = [
     "Sphinx>=8,<9",
     "sphinxcontrib-bibtex>=2.6,<3",

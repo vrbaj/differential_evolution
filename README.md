@@ -319,5 +319,22 @@ optimizer; inspect adapted state on `optimizer.mutation` and `optimizer.crossove
 not numerical convergence; `result.message` reports the exhausted limit.
 
 Sobol initialization uses a seeded digital shift by default. Use
-`SobolInitializer(scramble=False)` for the original unshifted sequence. All
-fixed-dimensional benchmarks, including Ackley, require exactly two coordinates.
+`SobolInitializer(scramble=False)` for the original unshifted sequence. Fixed-dimensional benchmarks require exactly two coordinates; Ackley is now
+n-dimensional in version 0.2.0.
+
+### Execution and provenance features (0.2.0)
+
+Generic DE now defaults to binomial crossover with CR=0.9; explicitly use
+`IdentityCrossover()` for donor-only mutation. SHADE/L-SHADE retain their fixed
+current-to-pbest/1/bin trial rules: their mutation and crossover placeholders
+are not extension points. Boundary repair, initialization, diagnostics and
+compatible schedules remain configurable.
+
+An optional `batch_objective(candidates)` can use an ordered external worker
+pool or vectorized objective. See `python -m examples.batch_evaluation` and
+[MIGRATION.md](MIGRATION.md) for budget, failure and controller semantics.
+Result metadata records initial configuration, seed, Python/package versions
+and an initial state for `random.Random`. Arbitrary callable implementations
+and datasets must still be saved separately. The new
+`BoundNormalizedDiversity(AveragePairwiseDistance())` wrapper removes coordinate
+unit effects from distance diagnostics. Ackley now accepts any positive dimension.

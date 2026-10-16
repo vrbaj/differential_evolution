@@ -1,7 +1,8 @@
 # Publishing DEFoundry
 
 The PyPI distribution is `defoundry`; the import package remains
-`differential_evolution`. Version `0.1.0` is the first release.
+`differential_evolution`. Version `0.1.0` was the first release; `0.2.0` adds ordered batch evaluation
+and run provenance (see `CHANGELOG.md`).
 The unrelated PyPI project `differential-evolution` must not be used.
 
 ## One-time account setup
@@ -57,28 +58,29 @@ top-level shims are available in the source archive. Installed users should use
 
 ## Release a version
 
-1. Set `[project].version` in `pyproject.toml`; Sphinx reads the same value.
-   Confirm the README's installation text matches the release status and write
-   release notes for user-visible changes.
-2. Commit all release files, push the commit and a matching tag such as `v0.1.0`.
-   Do not move a tag after publishing it.
-3. In GitHub Actions, manually run **release**, selecting that tag as the ref
-   and `testpypi` as the index. The workflow refuses branch refs or tags that
-   do not match the package version. All tests and distribution checks must
-   pass before the upload job can run.
-4. Check the TestPyPI project page and install the exact version in a new venv:
+1. Set `[project].version` in `pyproject.toml` and `__version__` in
+   `differential_evolution/_version.py`; Sphinx reads the project metadata.
+   Update `CHANGELOG.md`, installation instructions and migration guidance.
+2. Run the local validation above. Commit the release files and push the commit
+   plus a matching annotated tag, such as `v0.2.0`.
+3. Pushing a version tag automatically starts **release**. It checks that the tag
+   matches package metadata, runs the complete test matrix and distribution
+   checks, and publishes the verified artifacts through the `pypi` environment's
+   trusted publisher. A protected environment may require its configured approval.
+4. Confirm the workflow succeeds and verify a fresh installation:
 
    ```bash
-   python -m pip install --index-url https://test.pypi.org/simple/ --no-deps defoundry==0.1.0
+   python -m pip install defoundry==0.2.0
    python -c "from differential_evolution import DifferentialEvolution, SHADE, LSHADE"
    ```
 
-5. Run **release** again for the same tag, choosing `pypi`. This run builds and
-   checks its own artifacts before uploading. Afterwards verify a fresh install
-   with `python -m pip install defoundry==0.1.0` and inspect the PyPI README.
+For a manual run, select **release** in GitHub Actions, choose a version **tag**
+as the ref, and select `testpypi` or `pypi`. Branch refs are rejected. TestPyPI
+and PyPI have separate publisher registrations; a manual TestPyPI run does not
+publish to production. A tag push starts production publication automatically,
+so TestPyPI is an optional separate check in this workflow.
 
-Update the example version for subsequent releases. Each workflow run uploads
-exactly the artifacts it verified. Publishing a GitHub release or pushing a tag
-alone does not upload anything. PyPI versions cannot be overwritten; make a new
-version for corrections. This repository setup does not register the name,
-configure accounts, or upload a release by itself.
+Each run uploads exactly the artifacts it verified. Publishing a GitHub release
+alone does not upload to PyPI. Published PyPI versions cannot be overwritten;
+do not move their tags, and use a new version for corrections. The workflow does
+not register project names or configure accounts/publisher registrations itself.

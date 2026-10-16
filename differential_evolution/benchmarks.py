@@ -70,13 +70,12 @@ def three_hump_camel_function(x: list[float]) -> float:
 
 
 def ackley_function(x: list[float]) -> float:
-    """Two-dimensional Ackley benchmark with global minimum at ``[0, 0]``."""
-    if len(x) != 2:
-        raise ValueError("ackley_function requires exactly 2 dimensions.")
-    first_term = -20.0 * math.exp(-0.2 * math.sqrt(0.5 * (x[0] ** 2 + x[1] ** 2)))
-    second_term = -math.exp(
-        0.5 * (math.cos(2.0 * math.pi * x[0]) + math.cos(2.0 * math.pi * x[1]))
-    )
+    """N-dimensional Ackley benchmark (non-empty vector; minimum at zero)."""
+    if not x:
+        raise ValueError("ackley_function requires at least one coordinate.")
+    dimension = len(x)
+    first_term = -20.0 * math.exp(-0.2 * (math.hypot(*x) / math.sqrt(dimension)))
+    second_term = -math.exp(sum(math.cos(2.0 * math.pi * value) for value in x) / dimension)
     return first_term + second_term + math.e + 20.0
 
 

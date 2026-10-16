@@ -47,6 +47,7 @@ class ReviewRegressions(unittest.TestCase):
             if name.endswith("_function") and name not in (
                 "sphere_function",
                 "rastrigin_function",
+                "ackley_function",
             ):
                 for dimension in (0, 1, 3, 10):
                     with (

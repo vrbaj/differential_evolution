@@ -79,6 +79,8 @@ print('Installed wheel: public imports and DE/SHADE/LSHADE runs passed')
             cwd=source,
             check=True,
         )
+        for excluded in ("paper_template", "review_differential_evolution.md", "review_jocs_defoundry.md"):
+            assert not (source / excluded).exists(), f"Local artifact must not enter the sdist: {excluded}"
     print("Wheel and source distribution checks passed")
 
 
